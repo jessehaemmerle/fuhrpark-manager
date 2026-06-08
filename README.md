@@ -85,6 +85,14 @@ Start production:
 docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
 ```
 
+After Dockerfile changes, rebuild the app image without cache so the old Alpine
+image is not reused:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml build --no-cache app
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate app reverse-proxy
+```
+
 Open `http://your-domain-or-vm-ip`. If the VM is behind port forwarding, forward
 host port `80` to guest port `80`. To use another public port, set `HTTP_PORT`,
 for example `HTTP_PORT=8080`, and open `http://your-domain-or-vm-ip:8080`.
@@ -103,6 +111,10 @@ docker compose --env-file .env.production -f docker-compose.prod.yml ps
 docker compose --env-file .env.production -f docker-compose.prod.yml logs -f app reverse-proxy
 docker compose --env-file .env.production -f docker-compose.prod.yml down
 ```
+
+If Prisma reports a missing `libssl.so.1.1` inside `/app/node_modules/.prisma`,
+the server is still running an old Alpine-based app image. Rebuild with the
+`--no-cache app` command above.
 
 ## Demo Credentials
 
