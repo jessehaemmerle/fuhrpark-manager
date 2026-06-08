@@ -17,7 +17,8 @@ import {
   requireAuth,
   requireCompanyScope,
   requireFleetAdmin,
-  requireOwner
+  requireOwner,
+  requireRole
 } from "@/lib/auth";
 import { assertValidTimeRange, assertVehicleAvailability, findActiveTripConflict, validateMileage } from "@/lib/availability";
 import { assertFeatureAccess, assertWithinPlan, getPlan } from "@/lib/plans";
@@ -37,7 +38,8 @@ import {
   idSchema,
   maintenanceSchema,
   maintenanceStatusSchema,
-  subscriptionTierSchema,
+  platformCompanyLicenseSchema,
+  platformUserAccessSchema,
   tripCorrectionSchema,
   tripEndSchema,
   tripStartSchema,
@@ -74,7 +76,6 @@ async function getScopedBooking(bookingId: string, companyId: string) {
 
 function canManageTargetRole(actorRole: UserRole, targetRole: UserRole) {
   if (targetRole === "PLATFORM_ADMIN") return actorRole === "PLATFORM_ADMIN";
-  if (actorRole === "FLEET_MANAGER") return targetRole === "USER";
   return actorRole === "OWNER" || actorRole === "PLATFORM_ADMIN";
 }
 
@@ -689,7 +690,7 @@ export async function createHandover(formData: FormData) {
 
 export async function createDepartment(formData: FormData) {
   const user = await requireAuth();
-  requireFleetAdmin(user);
+  requireOwner(user);
   await assertWithinPlan(user.companyId, "departments");
   const data = parseForm(departmentSchema, formData);
   const department = await prisma.department.create({
@@ -708,7 +709,7 @@ export async function createDepartment(formData: FormData) {
 
 export async function updateDepartment(departmentId: string, formData: FormData) {
   const user = await requireAuth();
-  requireFleetAdmin(user);
+  requireOwner(user);
   const data = parseForm(departmentSchema, formData);
   const department = await prisma.department.findFirstOrThrow({
     where: { id: departmentId, companyId: user.companyId }
@@ -731,7 +732,7 @@ export async function updateDepartment(departmentId: string, formData: FormData)
 
 export async function deleteDepartment(formData: FormData) {
   const user = await requireAuth();
-  requireFleetAdmin(user);
+  requireOwner(user);
   const departmentId = idSchema.parse(formData.get("departmentId"));
   const department = await prisma.department.findFirstOrThrow({
     where: { id: departmentId, companyId: user.companyId }
@@ -750,7 +751,7 @@ export async function deleteDepartment(formData: FormData) {
 
 export async function createUser(formData: FormData) {
   const actor = await requireAuth();
-  requireFleetAdmin(actor);
+  requireOwner(actor);
   await assertWithinPlan(actor.companyId, "users");
   const data = parseForm(userCreateSchema, formData);
 
@@ -792,11 +793,12 @@ export async function createUser(formData: FormData) {
     metadata: { role: user.role }
   });
   revalidatePath("/users");
+  revalidatePath("/admin");
 }
 
 export async function updateUser(formData: FormData) {
   const actor = await requireAuth();
-  requireFleetAdmin(actor);
+  requireOwner(actor);
   const data = parseForm(userUpdateSchema, formData);
   const target = await prisma.user.findFirstOrThrow({
     where: { id: data.userId, companyId: actor.companyId }
@@ -804,9 +806,6 @@ export async function updateUser(formData: FormData) {
 
   if (!canManageTargetRole(actor.role, data.role)) {
     throw new Error("Diese Rolle darf nicht vergeben werden.");
-  }
-  if (target.role === "OWNER" && actor.role === "FLEET_MANAGER") {
-    throw new Error("Fleet Manager duerfen Owner nicht bearbeiten.");
   }
   if (data.departmentId) {
     await prisma.department.findFirstOrThrow({
@@ -841,11 +840,12 @@ export async function updateUser(formData: FormData) {
     metadata: { role: data.role, active: data.active }
   });
   revalidatePath("/users");
+  revalidatePath("/admin");
 }
 
 export async function deactivateUser(formData: FormData) {
   const actor = await requireAuth();
-  requireFleetAdmin(actor);
+  requireOwner(actor);
   const userId = idSchema.parse(formData.get("userId"));
   if (userId === actor.id) throw new Error("Sie koennen sich nicht selbst deaktivieren.");
   const target = await prisma.user.findFirstOrThrow({ where: { id: userId, companyId: actor.companyId } });
@@ -859,11 +859,12 @@ export async function deactivateUser(formData: FormData) {
     entityId: target.id
   });
   revalidatePath("/users");
+  revalidatePath("/admin");
 }
 
 export async function updateDriverPermissions(formData: FormData) {
   const actor = await requireAuth();
-  requireFleetAdmin(actor);
+  requireOwner(actor);
   const company = await prisma.company.findUniqueOrThrow({ where: { id: actor.companyId } });
   assertFeatureAccess(getPlan(company), "driverPermissionAccess");
   const data = parseForm(driverPermissionSchema, formData);
@@ -895,6 +896,7 @@ export async function updateDriverPermissions(formData: FormData) {
     }
   });
   revalidatePath("/users");
+  revalidatePath("/admin");
 }
 
 export async function updateCompanySettings(formData: FormData) {
@@ -930,28 +932,74 @@ export async function updateCompanySettings(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
-export async function changeSubscriptionTier(formData: FormData) {
-  const user = await requireAuth();
-  requireOwner(user);
-  const data = parseForm(subscriptionTierSchema, formData);
-  const company = await prisma.company.findUniqueOrThrow({ where: { id: user.companyId } });
+export async function updatePlatformCompanyLicense(formData: FormData) {
+  const actor = await requireRole(["PLATFORM_ADMIN"]);
+  const data = parseForm(platformCompanyLicenseSchema, formData);
+  const company = await prisma.company.findUniqueOrThrow({ where: { id: data.companyId } });
 
-  requireCompanyScope(user, company.id);
   await prisma.company.update({
     where: { id: company.id },
-    data: { subscriptionTier: data.tier }
+    data: {
+      subscriptionTier: data.subscriptionTier,
+      trialEndDate: data.trialEndDate,
+      active: data.active
+    }
   });
 
   await writeAuditLog({
     companyId: company.id,
-    actorUserId: user.id,
-    action: "subscription.tier_changed",
+    actorUserId: actor.id,
+    action: "platform.company_license_updated",
     entityType: "Company",
     entityId: company.id,
-    metadata: { from: company.subscriptionTier, to: data.tier, paymentIntegration: "not_configured" }
+    metadata: {
+      fromTier: company.subscriptionTier,
+      toTier: data.subscriptionTier,
+      active: data.active
+    }
   });
+  revalidatePath("/admin");
   revalidatePath("/subscription");
   revalidatePath("/dashboard");
+}
+
+export async function updatePlatformUserAccess(formData: FormData) {
+  const actor = await requireRole(["PLATFORM_ADMIN"]);
+  const data = parseForm(platformUserAccessSchema, formData);
+  const target = await prisma.user.findUniqueOrThrow({
+    where: { id: data.userId },
+    include: { company: true }
+  });
+
+  if (target.id === actor.id && !data.active) {
+    throw new Error("Sie koennen den eigenen Super-Admin-Zugang nicht deaktivieren.");
+  }
+
+  await prisma.user.update({
+    where: { id: target.id },
+    data: {
+      role: data.role,
+      active: data.active,
+      passwordHash: data.password ? await hashPassword(data.password) : undefined
+    }
+  });
+
+  await writeAuditLog({
+    companyId: target.companyId,
+    actorUserId: actor.id,
+    action: "platform.user_access_updated",
+    entityType: "User",
+    entityId: target.id,
+    metadata: {
+      email: target.email,
+      fromRole: target.role,
+      toRole: data.role,
+      active: data.active,
+      passwordChanged: Boolean(data.password)
+    }
+  });
+  revalidatePath("/admin");
+  revalidatePath("/users");
 }
 
 export async function assertVehicleTokenAccess(token: string) {

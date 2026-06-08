@@ -5,11 +5,15 @@ import { toCsv } from "@/lib/csv";
 import { assertFeatureAccess, getPlan } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 
-const managerOnly = new Set(["vehicles", "bookings", "maintenance", "users", "departments", "reports"]);
+const managerOnly = new Set(["vehicles", "bookings", "maintenance", "reports"]);
+const ownerOnly = new Set(["users", "departments"]);
 
 export async function GET(_: Request, { params }: { params: { type: string } }) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Nicht angemeldet." }, { status: 401 });
+  if (ownerOnly.has(params.type) && user.role !== "OWNER" && user.role !== "PLATFORM_ADMIN") {
+    return NextResponse.json({ error: "Nicht autorisiert." }, { status: 403 });
+  }
   if (managerOnly.has(params.type) && !isFleetAdmin(user.role)) {
     return NextResponse.json({ error: "Nicht autorisiert." }, { status: 403 });
   }

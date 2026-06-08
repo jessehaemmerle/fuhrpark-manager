@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
-import { requireAuth, requireFleetAdmin } from "@/lib/auth";
+import { requireAuth, requireOwner } from "@/lib/auth";
 import { roleLabels } from "@/lib/labels";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
@@ -18,7 +18,7 @@ export const metadata = {
 
 export default async function UsersPage() {
   const actor = await requireAuth();
-  requireFleetAdmin(actor);
+  requireOwner(actor);
   const [users, departments] = await Promise.all([
     prisma.user.findMany({
       where: { companyId: actor.companyId },

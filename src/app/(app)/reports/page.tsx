@@ -54,6 +54,16 @@ export default async function ReportsPage({
   }
 
   const reportData = await getReportData(user.companyId, searchParams);
+  const canExportTenantAdminData = user.role === "OWNER" || user.role === "PLATFORM_ADMIN";
+  const exportTypes = [
+    "vehicles",
+    "bookings",
+    "maintenance",
+    ...(canExportTenantAdminData ? ["users", "departments"] : []),
+    "trip-logs",
+    "damage-reports",
+    "handovers"
+  ];
 
   return (
     <div className="grid gap-6">
@@ -106,7 +116,7 @@ export default async function ReportsPage({
       </Card>
 
       <div className="flex flex-wrap gap-2">
-        {["vehicles", "bookings", "maintenance", "users", "departments", "trip-logs", "damage-reports", "handovers"].map((type) => (
+        {exportTypes.map((type) => (
           <Button key={type} asChild variant="outline" size="sm">
             <a href={`/api/export/${type}`}>{type}.csv</a>
           </Button>

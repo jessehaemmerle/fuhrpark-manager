@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { requireAuth, requireFleetAdmin } from "@/lib/auth";
+import { requireAuth, requireOwner } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 export const metadata = {
@@ -13,7 +13,7 @@ export const metadata = {
 
 export default async function DepartmentsPage() {
   const user = await requireAuth();
-  requireFleetAdmin(user);
+  requireOwner(user);
   const departments = await prisma.department.findMany({
     where: { companyId: user.companyId },
     include: { users: true },

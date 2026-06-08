@@ -1,11 +1,7 @@
-import { SubscriptionTier } from "@prisma/client";
-import { changeSubscriptionTier } from "@/server/actions";
 import { PricingCards } from "@/components/marketing/pricing-cards";
 import { UsageBars } from "@/components/app/usage-bars";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { SelectField } from "@/components/ui/select-field";
 import { requireAuth, requireOwner } from "@/lib/auth";
 import { getCompanyUsage, getPlan } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
@@ -37,20 +33,9 @@ export default async function SubscriptionPage() {
           </CardHeader>
           <CardContent className="grid gap-5">
             <UsageBars usage={usage} plan={plan} />
-            <form action={changeSubscriptionTier} className="grid gap-3">
-              <Label htmlFor="tier">Plan wechseln</Label>
-              <SelectField id="tier" name="tier" defaultValue={company.subscriptionTier}>
-                {Object.values(SubscriptionTier).map((tier) => (
-                  <option key={tier} value={tier}>
-                    {tier}
-                  </option>
-                ))}
-              </SelectField>
-              <Button>Plan wechseln</Button>
-              <p className="text-xs text-muted-foreground">
-                Zahlungsintegration ist noch nicht aktiv. Diese Aktion aktualisiert nur das interne Subscription-Tier.
-              </p>
-            </form>
+            <p className="text-sm text-muted-foreground">
+              Lizenz, Trial-Laufzeit und Mandantenstatus werden zentral im Super-Admin-Panel verwaltet.
+            </p>
           </CardContent>
         </Card>
         <Card>

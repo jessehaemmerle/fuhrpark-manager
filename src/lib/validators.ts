@@ -197,6 +197,16 @@ export const companySettingsSchema = z.object({
   retentionPeriodDays: z.coerce.number().int().min(30).max(3650)
 });
 
-export const subscriptionTierSchema = z.object({
-  tier: z.nativeEnum(SubscriptionTier)
+export const platformCompanyLicenseSchema = z.object({
+  companyId: idSchema,
+  subscriptionTier: z.nativeEnum(SubscriptionTier),
+  trialEndDate: z.coerce.date(),
+  active: checkbox.default(false)
+});
+
+export const platformUserAccessSchema = z.object({
+  userId: idSchema,
+  role: z.nativeEnum(UserRole),
+  active: checkbox.default(false),
+  password: z.preprocess((value) => (value === "" ? undefined : value), z.string().min(10).optional())
 });
