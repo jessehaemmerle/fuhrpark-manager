@@ -53,6 +53,7 @@ async function main() {
   await prisma.tripLog.deleteMany();
   await prisma.booking.deleteMany();
   await prisma.vehicle.deleteMany();
+  await prisma.license.deleteMany();
   await prisma.user.deleteMany();
   await prisma.department.deleteMany();
   await prisma.usageSnapshot.deleteMany();
@@ -207,6 +208,37 @@ async function main() {
         driverApproved: true,
         licenseClass: "B",
         licenseValidUntil: addDays(new Date(), 120)
+      }
+    })
+  ]);
+
+  await Promise.all([
+    prisma.license.create({
+      data: {
+        companyId: acme.id,
+        createdById: jessieAdmin.id,
+        licenseKey: "FB-DEMO-MUST-2026-PROF",
+        name: "Professional Jahreslizenz",
+        tier: "PROFESSIONAL",
+        validFrom: subDays(new Date(), 5),
+        validUntil: addDays(new Date(), 365),
+        maxUsers: 250,
+        maxVehicles: 75,
+        notes: "Beispieldatensatz fuer das Super-Admin-Panel."
+      }
+    }),
+    prisma.license.create({
+      data: {
+        companyId: alpina.id,
+        createdById: platformAdmin.id,
+        licenseKey: "FB-DEMO-ALPI-2026-BASIC",
+        name: "Basic Lizenz",
+        tier: "BASIC",
+        validFrom: subDays(new Date(), 20),
+        validUntil: addDays(new Date(), 180),
+        maxUsers: 25,
+        maxVehicles: 10,
+        notes: "Aktive Lizenz fuer Demo-Mandant."
       }
     })
   ]);

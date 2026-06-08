@@ -33,8 +33,7 @@ const navItems = [
   { href: "/departments", label: "Abteilungen", icon: Building2, roles: ["OWNER", "PLATFORM_ADMIN"] },
   { href: "/reports", label: "Reports", icon: BarChart3, roles: ["FLEET_MANAGER", "OWNER", "PLATFORM_ADMIN"] },
   { href: "/subscription", label: "Abo & Nutzung", icon: Shield, roles: ["OWNER", "PLATFORM_ADMIN"] },
-  { href: "/settings", label: "Einstellungen", icon: Settings, roles: ["OWNER", "PLATFORM_ADMIN"] },
-  { href: "/admin", label: "Platform Admin", icon: Shield, roles: ["PLATFORM_ADMIN"] }
+  { href: "/settings", label: "Einstellungen", icon: Settings, roles: ["OWNER", "PLATFORM_ADMIN"] }
 ] as const;
 
 export function AppShell({ user, children }: { user: AuthenticatedUser; children: React.ReactNode }) {

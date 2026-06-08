@@ -22,6 +22,11 @@ enum SubscriptionTier {
   ENTERPRISE
 }
 
+enum LicenseStatus {
+  ACTIVE
+  ARCHIVED
+}
+
 enum VehicleCategory {
   SEDAN
   SUV
@@ -122,6 +127,7 @@ model Company {
   damageReports          DamageReport[]
   departments            Department[]
   handovers              VehicleHandover[]
+  licenses               License[]
   maintenanceRecords     MaintenanceRecord[]
   tripLogs               TripLog[]
   usageSnapshots         UsageSnapshot[]
@@ -130,6 +136,30 @@ model Company {
 
   @@index([subscriptionTier])
   @@index([active])
+}
+
+model License {
+  id            String           @id @default(cuid())
+  companyId     String
+  licenseKey    String           @unique
+  name          String
+  status        LicenseStatus    @default(ACTIVE)
+  tier          SubscriptionTier
+  validFrom     DateTime         @default(now())
+  validUntil    DateTime
+  maxUsers      Int?
+  maxVehicles   Int?
+  notes         String?
+  archivedAt    DateTime?
+  createdById   String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  company       Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy     User?            @relation("LicensesCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status])
+  @@index([status, validUntil])
+  @@index([tier])
 }
 
 model User {
@@ -158,6 +188,7 @@ model User {
   damageReports        DamageReport[]     @relation("DamageReporter")
   department           Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   handovers            VehicleHandover[]
+  licensesCreated      License[]          @relation("LicensesCreatedBy")
   rejectedBookings     Booking[]          @relation("BookingRejectedBy")
   resolvedDamages      DamageReport[]     @relation("DamageResolvedBy")
   tripLogs             TripLog[]

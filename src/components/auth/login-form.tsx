@@ -12,10 +12,10 @@ import { loginSchema } from "@/lib/auth-validators";
 
 type LoginValues = z.infer<typeof loginSchema>;
 
-function redirectTarget() {
+function redirectTarget(fallback = "/dashboard") {
   const next = new URLSearchParams(window.location.search).get("next");
   if (next?.startsWith("/") && !next.startsWith("//")) return next;
-  return "/dashboard";
+  return fallback;
 }
 
 export function LoginForm() {
@@ -39,7 +39,7 @@ export function LoginForm() {
         setError(payload.error ?? "Login fehlgeschlagen.");
         return;
       }
-      window.location.assign(payload.redirectTo ?? redirectTarget());
+      window.location.assign(redirectTarget(payload.redirectTo ?? "/dashboard"));
     } catch {
       setError("Login fehlgeschlagen. Bitte Verbindung pruefen und erneut versuchen.");
     }

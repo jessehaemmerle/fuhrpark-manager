@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     }
 
     await setSessionCookie(user);
-    return NextResponse.json({ ok: true, redirectTo: "/dashboard" });
+    return NextResponse.json({ ok: true, redirectTo: user.role === "PLATFORM_ADMIN" ? "/admin" : "/dashboard" });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Login fehlgeschlagen." }, { status: 400 });
   }

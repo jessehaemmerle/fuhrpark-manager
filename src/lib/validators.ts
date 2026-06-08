@@ -4,6 +4,7 @@ import {
   DamageStatus,
   FuelType,
   HandoverType,
+  LicenseStatus,
   MaintenanceStatus,
   MaintenanceType,
   SubscriptionTier,
@@ -197,16 +198,48 @@ export const companySettingsSchema = z.object({
   retentionPeriodDays: z.coerce.number().int().min(30).max(3650)
 });
 
-export const platformCompanyLicenseSchema = z.object({
-  companyId: idSchema,
-  subscriptionTier: z.nativeEnum(SubscriptionTier),
-  trialEndDate: z.coerce.date(),
-  active: checkbox.default(false)
-});
-
 export const platformUserAccessSchema = z.object({
   userId: idSchema,
   role: z.nativeEnum(UserRole),
   active: checkbox.default(false),
   password: z.preprocess((value) => (value === "" ? undefined : value), z.string().min(10).optional())
+});
+
+const optionalPositiveInt = z.preprocess(
+  (value) => (value === "" || value === null ? undefined : value),
+  z.coerce.number().int().min(1).optional()
+);
+
+const platformLicenseBaseShape = {
+  companyId: idSchema,
+  name: requiredText("Lizenzname"),
+  tier: z.nativeEnum(SubscriptionTier),
+  validFrom: z.coerce.date(),
+  validUntil: z.coerce.date(),
+  maxUsers: optionalPositiveInt,
+  maxVehicles: optionalPositiveInt,
+  notes: optionalText
+};
+
+const validLicenseDateRange = <T extends { validFrom: Date; validUntil: Date }>(data: T) => data.validUntil >= data.validFrom;
+const licenseDateRangeMessage = {
+  message: "Die Lizenz darf nicht vor dem Startdatum enden.",
+  path: ["validUntil"]
+};
+
+export const platformLicenseCreateSchema = z.object(platformLicenseBaseShape).refine(validLicenseDateRange, licenseDateRangeMessage);
+
+export const platformLicenseUpdateSchema = z
+  .object({
+    ...platformLicenseBaseShape,
+    licenseId: idSchema,
+    status: z.nativeEnum(LicenseStatus)
+  })
+  .refine(validLicenseDateRange, {
+    message: "Die Lizenz darf nicht vor dem Startdatum enden.",
+    path: ["validUntil"]
+  });
+
+export const platformLicenseIdSchema = z.object({
+  licenseId: idSchema
 });

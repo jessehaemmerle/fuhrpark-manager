@@ -12,6 +12,11 @@ export const tierLabels: Record<string, string> = {
   ENTERPRISE: "Enterprise"
 };
 
+export const licenseStatusLabels: Record<string, string> = {
+  ACTIVE: "Aktiv",
+  ARCHIVED: "Archiviert"
+};
+
 export const vehicleStatusLabels: Record<string, string> = {
   AVAILABLE: "Verfuegbar",
   IN_USE: "In Nutzung",
@@ -91,8 +96,8 @@ export const handoverTypeLabels: Record<string, string> = {
 };
 
 export function statusTone(status: string) {
-  if (["AVAILABLE", "APPROVED", "COMPLETED", "RESOLVED"].includes(status)) return "success";
+  if (["AVAILABLE", "APPROVED", "COMPLETED", "RESOLVED", "ACTIVE"].includes(status)) return "success";
   if (["PENDING", "PLANNED", "IN_REVIEW", "SCHEDULED_FOR_REPAIR", "IN_PROGRESS"].includes(status)) return "warning";
-  if (["REJECTED", "CANCELLED", "CRITICAL", "DOWNTIME", "RETIRED"].includes(status)) return "danger";
+  if (["REJECTED", "CANCELLED", "CRITICAL", "DOWNTIME", "RETIRED", "ARCHIVED"].includes(status)) return "danger";
   return "neutral";
 }

@@ -38,7 +38,9 @@ import {
   idSchema,
   maintenanceSchema,
   maintenanceStatusSchema,
-  platformCompanyLicenseSchema,
+  platformLicenseCreateSchema,
+  platformLicenseIdSchema,
+  platformLicenseUpdateSchema,
   platformUserAccessSchema,
   tripCorrectionSchema,
   tripEndSchema,
@@ -54,6 +56,47 @@ function parseForm<T>(schema: { parse: (data: unknown) => T }, formData: FormDat
 
 function qrToken() {
   return randomBytes(32).toString("base64url");
+}
+
+function licenseKey() {
+  const raw = randomBytes(16).toString("hex").toUpperCase();
+  return `FB-${raw.match(/.{1,4}/g)?.join("-") ?? raw}`;
+}
+
+async function uniqueLicenseKey() {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const key = licenseKey();
+    const existing = await prisma.license.findUnique({ where: { licenseKey: key }, select: { id: true } });
+    if (!existing) return key;
+  }
+
+  throw new Error("Lizenzschluessel konnte nicht erzeugt werden.");
+}
+
+async function syncCompanyFromLatestActiveLicense(companyId: string, actorCompanyId: string) {
+  const activeLicense = await prisma.license.findFirst({
+    where: { companyId, status: "ACTIVE" },
+    orderBy: [{ validUntil: "desc" }, { createdAt: "desc" }]
+  });
+
+  if (activeLicense) {
+    await prisma.company.update({
+      where: { id: companyId },
+      data: {
+        subscriptionTier: activeLicense.tier,
+        trialEndDate: activeLicense.validUntil,
+        active: true
+      }
+    });
+    return;
+  }
+
+  if (companyId !== actorCompanyId) {
+    await prisma.company.update({
+      where: { id: companyId },
+      data: { active: false }
+    });
+  }
 }
 
 const directBookingStatuses = [BookingStatus.CANCELLED, BookingStatus.COMPLETED] as const;
@@ -932,31 +975,122 @@ export async function updateCompanySettings(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
-export async function updatePlatformCompanyLicense(formData: FormData) {
+export async function createPlatformLicense(formData: FormData) {
   const actor = await requireRole(["PLATFORM_ADMIN"]);
-  const data = parseForm(platformCompanyLicenseSchema, formData);
+  const data = parseForm(platformLicenseCreateSchema, formData);
   const company = await prisma.company.findUniqueOrThrow({ where: { id: data.companyId } });
-
-  await prisma.company.update({
-    where: { id: company.id },
+  const license = await prisma.license.create({
     data: {
-      subscriptionTier: data.subscriptionTier,
-      trialEndDate: data.trialEndDate,
-      active: data.active
+      companyId: company.id,
+      licenseKey: await uniqueLicenseKey(),
+      name: data.name,
+      tier: data.tier,
+      validFrom: data.validFrom,
+      validUntil: data.validUntil,
+      maxUsers: data.maxUsers ?? null,
+      maxVehicles: data.maxVehicles ?? null,
+      notes: data.notes ?? null,
+      createdById: actor.id
     }
   });
 
+  await syncCompanyFromLatestActiveLicense(company.id, actor.companyId);
   await writeAuditLog({
     companyId: company.id,
     actorUserId: actor.id,
-    action: "platform.company_license_updated",
-    entityType: "Company",
-    entityId: company.id,
+    action: "platform.license_created",
+    entityType: "License",
+    entityId: license.id,
     metadata: {
-      fromTier: company.subscriptionTier,
-      toTier: data.subscriptionTier,
-      active: data.active
+      licenseKey: license.licenseKey,
+      tier: license.tier,
+      validUntil: license.validUntil.toISOString()
     }
+  });
+  revalidatePath("/admin");
+  revalidatePath("/subscription");
+  revalidatePath("/dashboard");
+}
+
+export async function updatePlatformLicense(formData: FormData) {
+  const actor = await requireRole(["PLATFORM_ADMIN"]);
+  const data = parseForm(platformLicenseUpdateSchema, formData);
+  const existing = await prisma.license.findUniqueOrThrow({ where: { id: data.licenseId } });
+  const license = await prisma.license.update({
+    where: { id: existing.id },
+    data: {
+      companyId: data.companyId,
+      name: data.name,
+      status: data.status,
+      tier: data.tier,
+      validFrom: data.validFrom,
+      validUntil: data.validUntil,
+      maxUsers: data.maxUsers ?? null,
+      maxVehicles: data.maxVehicles ?? null,
+      notes: data.notes ?? null,
+      archivedAt: data.status === "ARCHIVED" ? existing.archivedAt ?? new Date() : null
+    }
+  });
+
+  await syncCompanyFromLatestActiveLicense(existing.companyId, actor.companyId);
+  if (license.companyId !== existing.companyId) {
+    await syncCompanyFromLatestActiveLicense(license.companyId, actor.companyId);
+  }
+  await writeAuditLog({
+    companyId: license.companyId,
+    actorUserId: actor.id,
+    action: "platform.license_updated",
+    entityType: "License",
+    entityId: license.id,
+    metadata: {
+      licenseKey: license.licenseKey,
+      status: license.status,
+      tier: license.tier
+    }
+  });
+  revalidatePath("/admin");
+  revalidatePath("/subscription");
+  revalidatePath("/dashboard");
+}
+
+export async function archivePlatformLicense(formData: FormData) {
+  const actor = await requireRole(["PLATFORM_ADMIN"]);
+  const data = parseForm(platformLicenseIdSchema, formData);
+  const license = await prisma.license.update({
+    where: { id: data.licenseId },
+    data: {
+      status: "ARCHIVED",
+      archivedAt: new Date()
+    }
+  });
+
+  await syncCompanyFromLatestActiveLicense(license.companyId, actor.companyId);
+  await writeAuditLog({
+    companyId: license.companyId,
+    actorUserId: actor.id,
+    action: "platform.license_archived",
+    entityType: "License",
+    entityId: license.id,
+    metadata: { licenseKey: license.licenseKey }
+  });
+  revalidatePath("/admin");
+  revalidatePath("/subscription");
+  revalidatePath("/dashboard");
+}
+
+export async function deletePlatformLicense(formData: FormData) {
+  const actor = await requireRole(["PLATFORM_ADMIN"]);
+  const data = parseForm(platformLicenseIdSchema, formData);
+  const license = await prisma.license.findUniqueOrThrow({ where: { id: data.licenseId } });
+  await prisma.license.delete({ where: { id: license.id } });
+  await syncCompanyFromLatestActiveLicense(license.companyId, actor.companyId);
+  await writeAuditLog({
+    companyId: license.companyId,
+    actorUserId: actor.id,
+    action: "platform.license_deleted",
+    entityType: "License",
+    entityId: license.id,
+    metadata: { licenseKey: license.licenseKey }
   });
   revalidatePath("/admin");
   revalidatePath("/subscription");
