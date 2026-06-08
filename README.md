@@ -72,12 +72,15 @@ Edit `.env.production` before the first start:
 
 ```bash
 POSTGRES_PASSWORD="use-a-strong-database-password"
-DATABASE_URL="postgresql://fleetbase:use-a-strong-database-password@postgres:5432/fleetbase?schema=public"
 JWT_SECRET="use-a-long-random-secret-at-least-32-characters"
 NEXT_PUBLIC_APP_URL="http://your-domain-or-vm-ip"
 NEXT_ALLOWED_ORIGINS="your-domain-or-vm-ip,localhost,127.0.0.1"
 HTTP_PORT=80
 ```
+
+The app container generates `DATABASE_URL` from `POSTGRES_USER`,
+`POSTGRES_PASSWORD` and `POSTGRES_DB` at startup. This keeps the app credentials
+and the Postgres credentials in sync.
 
 Start production:
 
@@ -89,8 +92,9 @@ After Dockerfile changes, rebuild the app image without cache so the old Alpine
 image is not reused:
 
 ```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml down --remove-orphans
 docker compose --env-file .env.production -f docker-compose.prod.yml build --no-cache app
-docker compose --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate app reverse-proxy
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate
 ```
 
 Open `http://your-domain-or-vm-ip`. If the VM is behind port forwarding, forward
@@ -114,7 +118,35 @@ docker compose --env-file .env.production -f docker-compose.prod.yml down
 
 If Prisma reports a missing `libssl.so.1.1` inside `/app/node_modules/.prisma`,
 the server is still running an old Alpine-based app image. Rebuild with the
-`--no-cache app` command above.
+`--no-cache app` command above, then verify the engine inside the running
+container:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml exec app sh -lc 'cat /etc/os-release && find node_modules/.prisma/client -name "libquery_engine*" -print'
+```
+
+The app container should report Debian and
+`libquery_engine-debian-openssl-3.0.x.so.node`, not `linux-musl`.
+
+If Prisma reports `Authentication failed against database server at postgres`,
+check whether `POSTGRES_PASSWORD` was changed after the database volume had
+already been created. The official Postgres image only uses `POSTGRES_PASSWORD`
+when initializing an empty volume; it does not update the existing database
+user later. To keep the existing data and sync the password to `.env.production`,
+run:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml exec postgres sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -v db_user="$POSTGRES_USER" -v db_password="$POSTGRES_PASSWORD" -c "ALTER USER :\"db_user\" WITH PASSWORD :'\'db_password\'';"'
+docker compose --env-file .env.production -f docker-compose.prod.yml restart app
+```
+
+For a fresh test deployment with no data to keep, you can reset the database
+volume instead:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml down -v
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
 
 ## Demo Credentials
 
