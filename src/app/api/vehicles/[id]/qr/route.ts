@@ -28,7 +28,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
   if (format === "png") {
     const buffer = await QRCode.toBuffer(url, { type: "png", margin: 2, width: 512 });
-    return new NextResponse(buffer, {
+    const body = Uint8Array.from(buffer).buffer;
+    return new NextResponse(body, {
       headers: {
         "Content-Type": "image/png",
         "Content-Disposition": `attachment; filename="${vehicle.licensePlate}-qr.png"`

@@ -54,6 +54,12 @@ function qrToken() {
   return randomBytes(32).toString("base64url");
 }
 
+const directBookingStatuses = [BookingStatus.CANCELLED, BookingStatus.COMPLETED] as const;
+
+function isDirectBookingStatus(status: BookingStatus): status is (typeof directBookingStatuses)[number] {
+  return directBookingStatuses.includes(status as (typeof directBookingStatuses)[number]);
+}
+
 async function getScopedVehicle(vehicleId: string, companyId: string) {
   return prisma.vehicle.findFirstOrThrow({
     where: { id: vehicleId, companyId }
@@ -303,7 +309,7 @@ export async function updateBookingStatus(formData: FormData) {
   const user = await requireAuth();
   const data = parseForm(bookingStatusSchema, formData);
   const booking = await getScopedBooking(data.bookingId, user.companyId);
-  if (![BookingStatus.CANCELLED, BookingStatus.COMPLETED].includes(data.status)) {
+  if (!isDirectBookingStatus(data.status)) {
     throw new Error("Genehmigungen und Ablehnungen muessen ueber den passenden Workflow erfolgen.");
   }
   const mayUpdateOwn = booking.userId === user.id && data.status === BookingStatus.CANCELLED;
