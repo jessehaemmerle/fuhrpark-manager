@@ -27,8 +27,7 @@ async function main() {
   const password = process.env.SUPER_ADMIN_PASSWORD;
 
   if (!password) {
-    console.warn("SUPER_ADMIN_PASSWORD ist nicht gesetzt. Super-Admin-Bootstrap wird uebersprungen.");
-    return;
+    throw new Error("SUPER_ADMIN_PASSWORD muss gesetzt sein, wenn BOOTSTRAP_SUPER_ADMIN aktiv ist.");
   }
 
   assertStrongPassword(password);

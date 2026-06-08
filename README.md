@@ -144,17 +144,14 @@ user later. To keep the existing data and sync the password to `.env.production`
 run:
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml exec -T postgres sh <<'SH'
-set -eu
-psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  -v ON_ERROR_STOP=1 \
-  -v db_user="$POSTGRES_USER" \
-  -v db_password="$POSTGRES_PASSWORD" <<'SQL'
-ALTER USER :"db_user" WITH PASSWORD :'db_password';
-SQL
-SH
-docker compose --env-file .env.production -f docker-compose.prod.yml restart app
+docker compose --env-file .env.production -f docker-compose.prod.yml stop app reverse-proxy
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d postgres
+docker compose --env-file .env.production -f docker-compose.prod.yml exec -T postgres sh < scripts/sync-postgres-password.sh
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate
 ```
+
+The production Postgres healthcheck verifies the configured password with a real
+`psql` login, so a mismatch is visible before the app tries to run migrations.
 
 For a fresh test deployment with no data to keep, you can reset the database
 volume instead:
