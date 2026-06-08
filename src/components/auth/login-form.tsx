@@ -12,6 +12,12 @@ import { loginSchema } from "@/lib/auth-validators";
 
 type LoginValues = z.infer<typeof loginSchema>;
 
+function redirectTarget() {
+  const next = new URLSearchParams(window.location.search).get("next");
+  if (next?.startsWith("/") && !next.startsWith("//")) return next;
+  return "/dashboard";
+}
+
 export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const form = useForm<LoginValues>({
@@ -21,17 +27,22 @@ export function LoginForm() {
 
   async function onSubmit(values: LoginValues) {
     setError(null);
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(values)
-    });
-    const payload = await response.json();
-    if (!response.ok) {
-      setError(payload.error ?? "Login fehlgeschlagen.");
-      return;
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values)
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(payload.error ?? "Login fehlgeschlagen.");
+        return;
+      }
+      window.location.assign(payload.redirectTo ?? redirectTarget());
+    } catch {
+      setError("Login fehlgeschlagen. Bitte Verbindung pruefen und erneut versuchen.");
     }
-    window.location.href = payload.redirectTo ?? "/dashboard";
   }
 
   return (

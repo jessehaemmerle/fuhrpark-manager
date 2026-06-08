@@ -42,6 +42,23 @@ function getJwtSecret() {
   return new TextEncoder().encode(secret ?? "development-only-secret-change-me-please");
 }
 
+function secureSessionCookie() {
+  const configured = process.env.SESSION_COOKIE_SECURE?.toLowerCase();
+  if (configured === "true") return true;
+  if (configured === "false") return false;
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (appUrl) {
+    try {
+      return new URL(appUrl).protocol === "https:";
+    } catch {
+      return process.env.NODE_ENV === "production";
+    }
+  }
+
+  return process.env.NODE_ENV === "production";
+}
+
 export async function hashPassword(password: string) {
   return bcrypt.hash(password, 12);
 }
@@ -72,7 +89,7 @@ export async function setSessionCookie(user: { id: string; companyId: string; ro
   const token = await signSession(user);
   cookies().set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: secureSessionCookie(),
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * SESSION_DAYS
@@ -82,7 +99,7 @@ export async function setSessionCookie(user: { id: string; companyId: string; ro
 export function clearSessionCookie() {
   cookies().set(SESSION_COOKIE, "", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: secureSessionCookie(),
     sameSite: "lax",
     path: "/",
     maxAge: 0

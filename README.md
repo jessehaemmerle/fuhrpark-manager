@@ -49,6 +49,7 @@ JWT_SECRET="replace-with-a-long-random-secret-at-least-32-characters"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 NEXT_ALLOWED_ORIGINS="localhost:3000,127.0.0.1:3000"
 NEXT_IMAGE_REMOTE_HOSTS=""
+SESSION_COOKIE_SECURE=false
 UPLOAD_STORAGE_DRIVER="local"
 ```
 
@@ -75,6 +76,7 @@ POSTGRES_PASSWORD="use-a-strong-database-password"
 JWT_SECRET="use-a-long-random-secret-at-least-32-characters"
 NEXT_PUBLIC_APP_URL="http://your-domain-or-vm-ip"
 NEXT_ALLOWED_ORIGINS="your-domain-or-vm-ip,localhost,127.0.0.1"
+SESSION_COOKIE_SECURE=false
 SUPER_ADMIN_EMAIL="jesse@haemmerle.at"
 SUPER_ADMIN_PASSWORD="use-a-long-random-admin-password"
 HTTP_PORT=80
@@ -83,6 +85,10 @@ HTTP_PORT=80
 The app container generates `DATABASE_URL` from `POSTGRES_USER`,
 `POSTGRES_PASSWORD` and `POSTGRES_DB` at startup. This keeps the app credentials
 and the Postgres credentials in sync.
+
+For HTTP deployments, keep `SESSION_COOKIE_SECURE=false`; otherwise browsers
+drop the login cookie and immediately send you back to `/login`. For HTTPS,
+set `NEXT_PUBLIC_APP_URL` to `https://...` and `SESSION_COOKIE_SECURE=true`.
 
 On every production start the app also upserts a platform admin from
 `SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_PASSWORD`. The password must contain at
