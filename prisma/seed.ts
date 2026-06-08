@@ -5,6 +5,7 @@ import { PrismaClient, SubscriptionTier } from "@prisma/client";
 
 const prisma = new PrismaClient();
 const passwordHash = bcrypt.hashSync("FleetbaseDemo123!", 12);
+const adminPasswordHash = bcrypt.hashSync("Km7#pQx9$vL2@mN4&jB8wZe3%Rc5!Td1", 12);
 
 function token() {
   return randomBytes(32).toString("base64url");
@@ -97,7 +98,17 @@ async function main() {
     }
   });
 
-  const [platformAdmin, owner, manager, userOne, userTwo, alpinaOwner, alpinaManager, alpinaUser] = await Promise.all([
+  const [jessieAdmin, platformAdmin, owner, manager, userOne, userTwo, alpinaOwner, alpinaManager, alpinaUser] = await Promise.all([
+    prisma.user.create({
+      data: {
+        companyId: platform.id,
+        name: "Jesse Admin",
+        email: "jesse@haemmerle.at",
+        passwordHash: adminPasswordHash,
+        role: "PLATFORM_ADMIN",
+        driverApproved: true
+      }
+    }),
     prisma.user.create({
       data: {
         companyId: platform.id,
