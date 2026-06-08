@@ -24,4 +24,8 @@ if [ "${RUN_MIGRATIONS:-true}" != "false" ]; then
   node node_modules/prisma/build/index.js migrate deploy
 fi
 
+if [ "${BOOTSTRAP_SUPER_ADMIN:-true}" != "false" ]; then
+  node scripts/bootstrap-super-admin.mjs
+fi
+
 exec node server.js

@@ -75,12 +75,20 @@ POSTGRES_PASSWORD="use-a-strong-database-password"
 JWT_SECRET="use-a-long-random-secret-at-least-32-characters"
 NEXT_PUBLIC_APP_URL="http://your-domain-or-vm-ip"
 NEXT_ALLOWED_ORIGINS="your-domain-or-vm-ip,localhost,127.0.0.1"
+SUPER_ADMIN_EMAIL="jesse@haemmerle.at"
+SUPER_ADMIN_PASSWORD="use-a-long-random-admin-password"
 HTTP_PORT=80
 ```
 
 The app container generates `DATABASE_URL` from `POSTGRES_USER`,
 `POSTGRES_PASSWORD` and `POSTGRES_DB` at startup. This keeps the app credentials
 and the Postgres credentials in sync.
+
+On every production start the app also upserts a platform admin from
+`SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_PASSWORD`. The password must contain at
+least 16 characters, upper and lower case letters, a number and a special
+character. Changing `SUPER_ADMIN_PASSWORD` and recreating the app container
+resets that admin password.
 
 Start production:
 
@@ -136,7 +144,15 @@ user later. To keep the existing data and sync the password to `.env.production`
 run:
 
 ```bash
-docker compose --env-file .env.production -f docker-compose.prod.yml exec postgres sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -v db_user="$POSTGRES_USER" -v db_password="$POSTGRES_PASSWORD" -c "ALTER USER :\"db_user\" WITH PASSWORD :'\'db_password\'';"'
+docker compose --env-file .env.production -f docker-compose.prod.yml exec -T postgres sh <<'SH'
+set -eu
+psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+  -v ON_ERROR_STOP=1 \
+  -v db_user="$POSTGRES_USER" \
+  -v db_password="$POSTGRES_PASSWORD" <<'SQL'
+ALTER USER :"db_user" WITH PASSWORD :'db_password';
+SQL
+SH
 docker compose --env-file .env.production -f docker-compose.prod.yml restart app
 ```
 
@@ -159,6 +175,7 @@ Password: FleetbaseDemo123!
 Accounts:
 
 - `admin@fleetbase.example` - PLATFORM_ADMIN
+- `jesse@haemmerle.at` - PLATFORM_ADMIN, password from `SUPER_ADMIN_PASSWORD` when set, otherwise demo password in local seed data
 - `owner@musterlogistik.example` - OWNER, Professional tenant
 - `manager@musterlogistik.example` - FLEET_MANAGER
 - `lisa@musterlogistik.example` - USER

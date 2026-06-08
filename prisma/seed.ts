@@ -5,7 +5,8 @@ import { PrismaClient, SubscriptionTier } from "@prisma/client";
 
 const prisma = new PrismaClient();
 const passwordHash = bcrypt.hashSync("FleetbaseDemo123!", 12);
-const adminPasswordHash = bcrypt.hashSync("Km7#pQx9$vL2@mN4&jB8wZe3%Rc5!Td1", 12);
+const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD ?? "FleetbaseDemo123!";
+const adminPasswordHash = bcrypt.hashSync(superAdminPassword, 12);
 
 function token() {
   return randomBytes(32).toString("base64url");
