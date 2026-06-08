@@ -27,6 +27,18 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+When running the app in a VM/WSL environment, the dev and production scripts bind
+Next.js to `0.0.0.0:3000`. If the browser runs outside that VM, either forward
+guest port `3000` to host port `3000` and open `http://localhost:3000`, or open
+the app through the VM IP, for example `http://192.168.x.x:3000`.
+
+If you use a VM IP or a different public hostname, set:
+
+```bash
+NEXT_PUBLIC_APP_URL="http://<host-or-vm-ip>:3000"
+NEXT_ALLOWED_ORIGINS="<host-or-vm-ip>:3000,localhost:3000,127.0.0.1:3000"
+```
+
 This workspace currently has no `node` or `npm` executable available, so commands could not be run locally here.
 
 ## Environment Variables
@@ -35,6 +47,7 @@ This workspace currently has no `node` or `npm` executable available, so command
 DATABASE_URL="postgresql://fleetbase:fleetbase@localhost:5432/fleetbase?schema=public"
 JWT_SECRET="replace-with-a-long-random-secret-at-least-32-characters"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
+NEXT_ALLOWED_ORIGINS="localhost:3000,127.0.0.1:3000"
 UPLOAD_STORAGE_DRIVER="local"
 ```
 
