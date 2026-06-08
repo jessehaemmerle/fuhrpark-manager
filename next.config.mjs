@@ -15,20 +15,24 @@ const configuredOrigins = [
     }
   });
 
+const imageRemoteHosts = (process.env.NEXT_IMAGE_REMOTE_HOSTS ?? "")
+  .split(",")
+  .map((host) => host.trim())
+  .filter(Boolean);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: "standalone",
   experimental: {
     serverActions: {
       allowedOrigins: [...new Set(configuredOrigins)]
     }
   },
   images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "**"
-      }
-    ]
+    remotePatterns: imageRemoteHosts.map((hostname) => ({
+      protocol: "https",
+      hostname
+    }))
   }
 };
 

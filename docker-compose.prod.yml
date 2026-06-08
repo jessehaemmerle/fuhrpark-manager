@@ -1,0 +1,50 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-fleetbase}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+      POSTGRES_DB: ${POSTGRES_DB:-fleetbase}
+    volumes:
+      - fleetbase_postgres_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fleetbase} -d ${POSTGRES_DB:-fleetbase}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      target: runner
+    restart: unless-stopped
+    env_file:
+      - ${APP_ENV_FILE:-.env.production}
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "3000"
+    volumes:
+      - fleetbase_uploads_prod:/app/public/uploads
+
+  reverse-proxy:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+
+volumes:
+  fleetbase_postgres_prod:
+  fleetbase_uploads_prod:

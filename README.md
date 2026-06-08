@@ -48,10 +48,61 @@ DATABASE_URL="postgresql://fleetbase:fleetbase@localhost:5432/fleetbase?schema=p
 JWT_SECRET="replace-with-a-long-random-secret-at-least-32-characters"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
 NEXT_ALLOWED_ORIGINS="localhost:3000,127.0.0.1:3000"
+NEXT_IMAGE_REMOTE_HOSTS=""
 UPLOAD_STORAGE_DRIVER="local"
 ```
 
 Use a strong `JWT_SECRET` in production. Never commit `.env`.
+
+## Production With Reverse Proxy
+
+The production stack uses:
+
+- `postgres` for PostgreSQL
+- `app` for the standalone Next.js server on internal port `3000`
+- `reverse-proxy` for Nginx on public port `80`
+
+Setup:
+
+```bash
+cp .env.production.example .env.production
+```
+
+Edit `.env.production` before the first start:
+
+```bash
+POSTGRES_PASSWORD="use-a-strong-database-password"
+DATABASE_URL="postgresql://fleetbase:use-a-strong-database-password@postgres:5432/fleetbase?schema=public"
+JWT_SECRET="use-a-long-random-secret-at-least-32-characters"
+NEXT_PUBLIC_APP_URL="http://your-domain-or-vm-ip"
+NEXT_ALLOWED_ORIGINS="your-domain-or-vm-ip,localhost,127.0.0.1"
+HTTP_PORT=80
+```
+
+Start production:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
+
+Open `http://your-domain-or-vm-ip`. If the VM is behind port forwarding, forward
+host port `80` to guest port `80`. To use another public port, set `HTTP_PORT`,
+for example `HTTP_PORT=8080`, and open `http://your-domain-or-vm-ip:8080`.
+
+The app container runs `prisma migrate deploy` before starting by default. Set
+`RUN_MIGRATIONS=false` if you want to run migrations manually:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml exec app node node_modules/prisma/build/index.js migrate deploy
+```
+
+Useful production commands:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml ps
+docker compose --env-file .env.production -f docker-compose.prod.yml logs -f app reverse-proxy
+docker compose --env-file .env.production -f docker-compose.prod.yml down
+```
 
 ## Demo Credentials
 
@@ -177,6 +228,7 @@ npm run lint
 npm run typecheck
 npm run test
 npm run db:migrate
+npm run db:migrate:deploy
 npm run db:seed
 npm run db:studio
 ```
