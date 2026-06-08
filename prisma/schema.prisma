@@ -1,0 +1,419 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  OWNER
+  FLEET_MANAGER
+  USER
+  PLATFORM_ADMIN
+}
+
+enum SubscriptionTier {
+  TRIAL
+  BASIC
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum VehicleCategory {
+  SEDAN
+  SUV
+  TRUCK
+  VAN
+  HATCHBACK
+  COUPE
+  OTHER
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  IN_USE
+  DOWNTIME
+  MAINTENANCE
+  RETIRED
+}
+
+enum FuelType {
+  GASOLINE
+  DIESEL
+  HYBRID
+  ELECTRIC
+  HYDROGEN
+  OTHER
+}
+
+enum BookingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
+enum MaintenanceStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum MaintenanceType {
+  INSPECTION
+  REPAIR
+  TIRE_CHANGE
+  SERVICE
+  CLEANING
+  OTHER
+}
+
+enum TripType {
+  BUSINESS
+  PRIVATE
+  COMMUTE
+  OTHER
+}
+
+enum DamageSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum DamageStatus {
+  OPEN
+  IN_REVIEW
+  SCHEDULED_FOR_REPAIR
+  RESOLVED
+  REJECTED
+}
+
+enum HandoverType {
+  HANDOVER
+  RETURN
+}
+
+model Company {
+  id                     String             @id @default(cuid())
+  name                   String
+  slug                   String             @unique
+  logoUrl                String?
+  primaryBrandColor      String             @default("#0f766e")
+  address                String?
+  country                String             @default("DE")
+  contactEmail           String
+  contactPhone           String?
+  subscriptionTier       SubscriptionTier   @default(TRIAL)
+  trialStartDate         DateTime           @default(now())
+  trialEndDate           DateTime
+  active                 Boolean            @default(true)
+  retentionPeriodDays    Int                @default(3650)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  auditLogs              AuditLog[]
+  bookings               Booking[]
+  damageReports          DamageReport[]
+  departments            Department[]
+  handovers              VehicleHandover[]
+  maintenanceRecords     MaintenanceRecord[]
+  tripLogs               TripLog[]
+  usageSnapshots         UsageSnapshot[]
+  users                  User[]
+  vehicles               Vehicle[]
+
+  @@index([subscriptionTier])
+  @@index([active])
+}
+
+model User {
+  id                   String             @id @default(cuid())
+  companyId            String
+  departmentId         String?
+  name                 String
+  email                String             @unique
+  passwordHash         String
+  role                 UserRole           @default(USER)
+  active               Boolean            @default(true)
+  licenseNumber        String?
+  licenseClass         String?
+  licenseValidUntil    DateTime?
+  lastLicenseCheckDate DateTime?
+  driverApproved       Boolean            @default(false)
+  driverBlocked        Boolean            @default(false)
+  driverNotes          String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  approvedBookings     Booking[]          @relation("BookingApprovedBy")
+  auditLogs            AuditLog[]         @relation("ActorAuditLogs")
+  bookings             Booking[]
+  company              Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdMaintenance   MaintenanceRecord[]
+  damageReports        DamageReport[]     @relation("DamageReporter")
+  department           Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  handovers            VehicleHandover[]
+  rejectedBookings     Booking[]          @relation("BookingRejectedBy")
+  resolvedDamages      DamageReport[]     @relation("DamageResolvedBy")
+  tripLogs             TripLog[]
+
+  @@index([companyId, role])
+  @@index([companyId, active])
+  @@index([departmentId])
+}
+
+model Department {
+  id          String   @id @default(cuid())
+  companyId   String
+  name        String
+  description String?
+  managerName String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  company     Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  users       User[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+}
+
+model Vehicle {
+  id                 String              @id @default(cuid())
+  companyId          String
+  internalNumber     String
+  licensePlate       String
+  brand              String
+  model              String
+  year               Int?
+  vin                String?
+  category           VehicleCategory
+  status             VehicleStatus       @default(AVAILABLE)
+  fuelType           FuelType            @default(DIESEL)
+  mileage            Int                 @default(0)
+  location           String?
+  notes              String?
+  imageUrl           String?
+  qrCodeToken        String?             @unique
+  qrCodeEnabled      Boolean             @default(true)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  bookings           Booking[]
+  company            Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  damageReports      DamageReport[]
+  handovers          VehicleHandover[]
+  maintenanceRecords MaintenanceRecord[]
+  tripLogs           TripLog[]
+
+  @@unique([companyId, internalNumber])
+  @@unique([companyId, licensePlate])
+  @@index([companyId, status])
+  @@index([companyId, category])
+}
+
+model Booking {
+  id            String        @id @default(cuid())
+  companyId     String
+  vehicleId     String
+  userId        String
+  startAt       DateTime
+  endAt         DateTime
+  purpose       String
+  destination   String?
+  status        BookingStatus @default(PENDING)
+  approvalNote  String?
+  rejectionNote String?
+  approvedById  String?
+  approvedAt    DateTime?
+  rejectedById  String?
+  rejectedAt    DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  approvedBy    User?         @relation("BookingApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  company       Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  damageReports DamageReport[]
+  handovers     VehicleHandover[]
+  rejectedBy    User?         @relation("BookingRejectedBy", fields: [rejectedById], references: [id], onDelete: SetNull)
+  tripLogs      TripLog[]
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle       Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status])
+  @@index([companyId, vehicleId, startAt, endAt])
+  @@index([companyId, userId])
+}
+
+model MaintenanceRecord {
+  id             String            @id @default(cuid())
+  companyId      String
+  vehicleId      String
+  title          String
+  description    String?
+  type           MaintenanceType
+  startAt        DateTime
+  endAt          DateTime
+  cost           Decimal           @default(0) @db.Decimal(10, 2)
+  vendor         String?
+  status         MaintenanceStatus @default(PLANNED)
+  damageReportId String?
+  createdById    String
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  company        Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy      User              @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  damageReport   DamageReport?     @relation(fields: [damageReportId], references: [id], onDelete: SetNull)
+  vehicle        Vehicle           @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status])
+  @@index([companyId, vehicleId, startAt, endAt])
+}
+
+model TripLog {
+  id             String    @id @default(cuid())
+  companyId      String
+  vehicleId      String
+  userId         String
+  bookingId      String?
+  startAt        DateTime  @default(now())
+  endAt          DateTime?
+  startMileage   Int
+  endMileage     Int?
+  distance       Int?
+  startLocation  String?
+  destination    String?
+  purpose        String
+  tripType       TripType  @default(BUSINESS)
+  notes          String?
+  correctionNote String?
+  locked         Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  booking        Booking?  @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  company        Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  damageReports  DamageReport[]
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle        Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, vehicleId])
+  @@index([companyId, userId])
+  @@index([companyId, startAt])
+}
+
+model DamageReport {
+  id              String              @id @default(cuid())
+  companyId       String
+  vehicleId       String
+  reporterUserId  String
+  bookingId       String?
+  tripLogId       String?
+  handoverId      String?
+  title           String
+  description     String
+  damageLocation  String?
+  severity        DamageSeverity      @default(LOW)
+  status          DamageStatus        @default(OPEN)
+  photoUrls       String[]            @default([])
+  repairCost      Decimal?            @db.Decimal(10, 2)
+  resolvedById    String?
+  resolvedAt      DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  booking         Booking?            @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  company         Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  handover        VehicleHandover?    @relation(fields: [handoverId], references: [id], onDelete: SetNull)
+  maintenance     MaintenanceRecord[]
+  reporter        User                @relation("DamageReporter", fields: [reporterUserId], references: [id], onDelete: Cascade)
+  resolvedBy      User?               @relation("DamageResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+  tripLog         TripLog?            @relation(fields: [tripLogId], references: [id], onDelete: SetNull)
+  vehicle         Vehicle             @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status])
+  @@index([companyId, severity])
+  @@index([companyId, vehicleId])
+}
+
+model VehicleHandover {
+  id                      String         @id @default(cuid())
+  companyId               String
+  vehicleId               String
+  bookingId               String?
+  userId                  String
+  type                    HandoverType
+  handledAt               DateTime       @default(now())
+  mileage                 Int
+  energyLevel             Int?
+  exteriorConditionNote   String?
+  interiorConditionNote   String?
+  existingDamageConfirmed Boolean        @default(false)
+  newDamageReported       Boolean        @default(false)
+  signatureName           String?
+  photoUrls               String[]       @default([])
+  createdAt               DateTime       @default(now())
+  booking                 Booking?       @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  company                 Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  damageReports           DamageReport[]
+  user                    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vehicle                 Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, type])
+  @@index([companyId, vehicleId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  companyId  String
+  actorUserId String?
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  actor      User?    @relation("ActorAuditLogs", fields: [actorUserId], references: [id], onDelete: SetNull)
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, action])
+  @@index([companyId, entityType, entityId])
+  @@index([createdAt])
+}
+
+model UsageSnapshot {
+  id                      String           @id @default(cuid())
+  companyId               String
+  month                   DateTime
+  subscriptionTier        SubscriptionTier
+  vehicles                Int
+  users                   Int
+  departments             Int
+  activeBookings          Int
+  monthlyTripLogs         Int
+  monthlyDamageReports    Int
+  createdAt               DateTime         @default(now())
+  company                 Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, month])
+  @@index([companyId])
+}
+
+model SubscriptionPlanConfig {
+  id                         String           @id @default(cuid())
+  tier                       SubscriptionTier @unique
+  maxVehicles                Int
+  maxUsers                   Int
+  maxDepartments             Int
+  maxActiveBookings          Int
+  maxMonthlyTripLogs         Int
+  maxMonthlyDamageReports    Int
+  analyticsAccess            Boolean
+  csvExportAccess            Boolean
+  customBrandingAccess       Boolean
+  qrCodeAccess               Boolean
+  maintenanceModuleAccess    Boolean
+  driverPermissionAccess     Boolean
+  prioritySupport            Boolean
+  monthlyPriceCents          Int?
+  createdAt                  DateTime         @default(now())
+  updatedAt                  DateTime         @updatedAt
+}

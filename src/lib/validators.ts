@@ -1,0 +1,202 @@
+import {
+  BookingStatus,
+  DamageSeverity,
+  DamageStatus,
+  FuelType,
+  HandoverType,
+  MaintenanceStatus,
+  MaintenanceType,
+  SubscriptionTier,
+  TripType,
+  UserRole,
+  VehicleCategory,
+  VehicleStatus
+} from "@prisma/client";
+import { z } from "zod";
+export { loginSchema, registerSchema } from "@/lib/auth-validators";
+
+const requiredText = (label: string, min = 2) =>
+  z
+    .string({ required_error: `${label} ist erforderlich.` })
+    .trim()
+    .min(min, `${label} ist erforderlich.`)
+    .max(500, `${label} ist zu lang.`)
+    .transform((value) => value.replace(/[<>]/g, ""));
+
+const optionalText = z
+  .preprocess((value) => (value === "" || value === null ? undefined : value), z.string().trim().max(1500).optional())
+  .transform((value) => value?.replace(/[<>]/g, ""));
+
+const optionalShortText = z
+  .preprocess((value) => (value === "" || value === null ? undefined : value), z.string().trim().max(255).optional())
+  .transform((value) => value?.replace(/[<>]/g, ""));
+
+const optionalDate = z.preprocess((value) => (value === "" || value === null ? undefined : value), z.coerce.date().optional());
+
+const checkbox = z.preprocess((value) => value === "on" || value === true || value === "true", z.boolean());
+
+export const idSchema = z.string().min(8);
+
+export const vehicleSchema = z.object({
+  internalNumber: requiredText("Interne Nummer", 1),
+  licensePlate: requiredText("Kennzeichen", 2),
+  brand: requiredText("Marke"),
+  model: requiredText("Modell"),
+  year: z.preprocess((value) => (value === "" ? undefined : value), z.coerce.number().int().min(1950).max(2100).optional()),
+  vin: optionalShortText,
+  category: z.nativeEnum(VehicleCategory),
+  status: z.nativeEnum(VehicleStatus).default(VehicleStatus.AVAILABLE),
+  fuelType: z.nativeEnum(FuelType).default(FuelType.DIESEL),
+  mileage: z.coerce.number().int().min(0),
+  location: optionalShortText,
+  notes: optionalText,
+  imageUrl: optionalShortText,
+  qrCodeEnabled: checkbox.default(false)
+});
+
+export const bookingSchema = z.object({
+  vehicleId: idSchema,
+  startAt: z.coerce.date(),
+  endAt: z.coerce.date(),
+  purpose: requiredText("Zweck"),
+  destination: optionalShortText
+});
+
+export const bookingDecisionSchema = z.object({
+  bookingId: idSchema,
+  note: optionalText
+});
+
+export const bookingStatusSchema = z.object({
+  bookingId: idSchema,
+  status: z.nativeEnum(BookingStatus)
+});
+
+export const tripStartSchema = z.object({
+  vehicleId: idSchema,
+  bookingId: z.preprocess((value) => (value === "" ? undefined : value), idSchema.optional()),
+  startMileage: z.coerce.number().int().min(0),
+  startLocation: optionalShortText,
+  destination: optionalShortText,
+  purpose: requiredText("Zweck"),
+  tripType: z.nativeEnum(TripType)
+});
+
+export const tripEndSchema = z.object({
+  tripLogId: idSchema,
+  endMileage: z.coerce.number().int().min(0),
+  destination: optionalShortText,
+  notes: optionalText
+});
+
+export const tripCorrectionSchema = z.object({
+  tripLogId: idSchema,
+  correctionNote: requiredText("Korrekturhinweis", 5)
+});
+
+export const maintenanceSchema = z.object({
+  vehicleId: idSchema,
+  title: requiredText("Titel"),
+  description: optionalText,
+  type: z.nativeEnum(MaintenanceType),
+  startAt: z.coerce.date(),
+  endAt: z.coerce.date(),
+  cost: z.coerce.number().min(0).default(0),
+  vendor: optionalShortText,
+  status: z.nativeEnum(MaintenanceStatus).default(MaintenanceStatus.PLANNED),
+  damageReportId: z.preprocess((value) => (value === "" ? undefined : value), idSchema.optional())
+});
+
+export const maintenanceStatusSchema = z.object({
+  maintenanceId: idSchema,
+  status: z.nativeEnum(MaintenanceStatus)
+});
+
+export const damageSchema = z.object({
+  vehicleId: idSchema,
+  bookingId: z.preprocess((value) => (value === "" ? undefined : value), idSchema.optional()),
+  tripLogId: z.preprocess((value) => (value === "" ? undefined : value), idSchema.optional()),
+  handoverId: z.preprocess((value) => (value === "" ? undefined : value), idSchema.optional()),
+  title: requiredText("Titel"),
+  description: requiredText("Beschreibung", 5),
+  damageLocation: optionalShortText,
+  severity: z.nativeEnum(DamageSeverity),
+  photoUrls: optionalText
+});
+
+export const damageStatusSchema = z.object({
+  damageReportId: idSchema,
+  status: z.nativeEnum(DamageStatus),
+  repairCost: z.preprocess((value) => (value === "" ? undefined : value), z.coerce.number().min(0).optional())
+});
+
+export const handoverSchema = z.object({
+  vehicleId: idSchema,
+  bookingId: z.preprocess((value) => (value === "" ? undefined : value), idSchema.optional()),
+  type: z.nativeEnum(HandoverType),
+  handledAt: z.coerce.date().default(() => new Date()),
+  mileage: z.coerce.number().int().min(0),
+  energyLevel: z.preprocess((value) => (value === "" ? undefined : value), z.coerce.number().int().min(0).max(100).optional()),
+  exteriorConditionNote: optionalText,
+  interiorConditionNote: optionalText,
+  existingDamageConfirmed: checkbox.default(false),
+  newDamageReported: checkbox.default(false),
+  signatureName: optionalShortText,
+  photoUrls: optionalText,
+  createDamageTitle: optionalShortText,
+  createDamageDescription: optionalText
+});
+
+export const departmentSchema = z.object({
+  name: requiredText("Name"),
+  description: optionalText,
+  managerName: optionalShortText
+});
+
+export const userCreateSchema = z.object({
+  name: requiredText("Name"),
+  email: z.string().trim().email().toLowerCase(),
+  password: z.string().min(10),
+  role: z.nativeEnum(UserRole),
+  departmentId: z.preprocess((value) => (value === "" ? undefined : value), idSchema.optional()),
+  driverApproved: checkbox.default(false),
+  driverBlocked: checkbox.default(false),
+  licenseClass: optionalShortText,
+  licenseNumber: optionalShortText,
+  licenseValidUntil: optionalDate,
+  driverNotes: optionalText
+});
+
+export const userUpdateSchema = userCreateSchema
+  .omit({ password: true })
+  .extend({
+    userId: idSchema,
+    password: z.preprocess((value) => (value === "" ? undefined : value), z.string().min(10).optional()),
+    active: checkbox.default(true)
+  });
+
+export const driverPermissionSchema = z.object({
+  userId: idSchema,
+  driverApproved: checkbox.default(false),
+  driverBlocked: checkbox.default(false),
+  licenseClass: optionalShortText,
+  licenseNumber: optionalShortText,
+  licenseValidUntil: optionalDate,
+  lastLicenseCheckDate: optionalDate,
+  driverNotes: optionalText
+});
+
+export const companySettingsSchema = z.object({
+  name: requiredText("Firmenname"),
+  logoUrl: optionalShortText,
+  primaryBrandColor: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, "Bitte Hex-Farbe eingeben."),
+  address: optionalText,
+  country: z.string().trim().min(2).max(2),
+  contactEmail: z.string().trim().email(),
+  contactPhone: optionalShortText,
+  retentionPeriodDays: z.coerce.number().int().min(30).max(3650)
+});
+
+export const subscriptionTierSchema = z.object({
+  tier: z.nativeEnum(SubscriptionTier)
+});
