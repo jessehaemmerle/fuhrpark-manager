@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { UserRole } from "@prisma/client";
 import { PageHeader } from "@/components/app/page-header";
 import { createUser, deactivateUser, updateDriverPermissions, updateUser } from "@/server/actions";
@@ -17,7 +18,11 @@ export const metadata = {
   title: "Nutzer"
 };
 
-export default async function UsersPage() {
+function temporaryPassword() {
+  return `Fb7-${randomBytes(10).toString("base64url")}`;
+}
+
+export default async function UsersPage({ searchParams }: { searchParams?: { userCreated?: string; userError?: string } }) {
   const actor = await requireAuth();
   requireOwner(actor);
   const [users, departments] = await Promise.all([
@@ -127,10 +132,20 @@ export default async function UsersPage() {
             <CardTitle>Nutzer anlegen</CardTitle>
           </CardHeader>
           <CardContent>
+            {searchParams?.userError ? (
+              <p className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">{searchParams.userError}</p>
+            ) : null}
+            {searchParams?.userCreated ? (
+              <p className="mb-4 rounded-md bg-emerald-50 p-3 text-sm text-emerald-700">Nutzer wurde angelegt.</p>
+            ) : null}
             <form action={createUser} className="grid gap-4">
               <Field name="name" label="Name" idSuffix="new" />
               <Field name="email" label="E-Mail" type="email" idSuffix="new" />
-              <Field name="password" label="Initialpasswort" type="password" idSuffix="new" />
+              <div className="grid gap-2">
+                <Label htmlFor="password-new">Einmalpasswort</Label>
+                <Input id="password-new" name="password" defaultValue={temporaryPassword()} autoComplete="new-password" />
+                <p className="text-xs text-muted-foreground">Der Nutzer muss danach ein eigenes Passwort vergeben.</p>
+              </div>
               <div className="grid gap-2">
                 <Label htmlFor="role">Rolle</Label>
                 <SelectField id="role" name="role" defaultValue={UserRole.USER}>

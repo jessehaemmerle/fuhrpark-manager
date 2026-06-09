@@ -2,6 +2,7 @@
 
 import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import {
   BookingStatus,
   DamageStatus,
@@ -54,6 +55,19 @@ import {
 
 function parseForm<T>(schema: { parse: (data: unknown) => T }, formData: FormData): T {
   return schema.parse(toFormDataObject(formData));
+}
+
+function actionErrorMessage(error: unknown, fallback: string) {
+  if (!(error instanceof Error)) return fallback;
+  if (error.message.includes("Unique constraint") || error.message.includes("User_email_key")) {
+    return "Diese E-Mail ist bereits vergeben.";
+  }
+  return error.message || fallback;
+}
+
+function redirectToUserCreateError(message: string): never {
+  const params = new URLSearchParams({ userError: message.slice(0, 300) });
+  redirect(`/users?${params.toString()}#new-user`);
 }
 
 function qrToken() {
@@ -821,38 +835,58 @@ export async function deleteDepartment(formData: FormData) {
 export async function createUser(formData: FormData) {
   const actor = await requireAuth();
   requireOwner(actor);
-  await assertWithinPlan(actor.companyId, "users");
-  const data = parseForm(userCreateSchema, formData);
-
-  if (!canManageTargetRole(actor.role, data.role)) {
-    throw new Error("Diese Rolle darf nicht vergeben werden.");
+  const parsed = userCreateSchema.safeParse(toFormDataObject(formData));
+  if (!parsed.success) {
+    redirectToUserCreateError(parsed.error.issues[0]?.message ?? "Bitte Eingaben pruefen.");
   }
+  const data = parsed.data;
+  let user!: { id: string; role: UserRole };
 
-  if (data.departmentId) {
-    await prisma.department.findFirstOrThrow({
-      where: { id: data.departmentId, companyId: actor.companyId }
-    });
-  }
+  try {
+    await assertWithinPlan(actor.companyId, "users");
 
-  const passwordHash = await hashPassword(data.password);
-  const user = await prisma.user.create({
-    data: {
-      companyId: actor.companyId,
-      departmentId: data.departmentId,
-      name: data.name,
-      email: data.email,
-      passwordHash,
-      role: data.role,
-      driverApproved: data.driverApproved,
-      driverBlocked: data.driverBlocked,
-      licenseClass: data.licenseClass,
-      licenseNumber: data.licenseNumber,
-      licenseValidUntil: data.licenseValidUntil,
-      driverNotes: data.driverNotes,
-      passwordChangedAt: new Date(),
-      lastLicenseCheckDate: new Date()
+    if (!canManageTargetRole(actor.role, data.role)) {
+      throw new Error("Diese Rolle darf nicht vergeben werden.");
     }
-  });
+
+    const existingUser = await prisma.user.findUnique({
+      where: { email: data.email },
+      select: { id: true }
+    });
+
+    if (existingUser) {
+      throw new Error("Diese E-Mail ist bereits vergeben.");
+    }
+
+    if (data.departmentId) {
+      await prisma.department.findFirstOrThrow({
+        where: { id: data.departmentId, companyId: actor.companyId }
+      });
+    }
+
+    const passwordHash = await hashPassword(data.password);
+    user = await prisma.user.create({
+      data: {
+        companyId: actor.companyId,
+        departmentId: data.departmentId,
+        name: data.name,
+        email: data.email,
+        passwordHash,
+        role: data.role,
+        driverApproved: data.driverApproved,
+        driverBlocked: data.driverBlocked,
+        licenseClass: data.licenseClass,
+        licenseNumber: data.licenseNumber,
+        licenseValidUntil: data.licenseValidUntil,
+        driverNotes: data.driverNotes,
+        mustChangePassword: true,
+        temporaryPasswordIssuedAt: new Date(),
+        lastLicenseCheckDate: new Date()
+      }
+    });
+  } catch (error) {
+    redirectToUserCreateError(actionErrorMessage(error, "Nutzer konnte nicht angelegt werden."));
+  }
 
   await writeAuditLog({
     companyId: actor.companyId,
@@ -860,10 +894,11 @@ export async function createUser(formData: FormData) {
     action: "user.created",
     entityType: "User",
     entityId: user.id,
-    metadata: { role: user.role }
+    metadata: { role: user.role, mustChangePassword: true }
   });
   revalidatePath("/users");
   revalidatePath("/admin");
+  redirect("/users?userCreated=1#new-user");
 }
 
 export async function updateUser(formData: FormData) {
