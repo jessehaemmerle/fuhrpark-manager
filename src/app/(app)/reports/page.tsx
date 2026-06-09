@@ -12,6 +12,7 @@ import { getReportData } from "@/lib/dashboard";
 import { damageSeverityLabels, tripTypeLabels } from "@/lib/labels";
 import { getPlan } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
+import { formatCurrency } from "@/lib/utils";
 
 export const metadata = {
   title: "Reports"
@@ -83,6 +84,12 @@ export default async function ReportsPage({
       searchParams.tripType ||
       searchParams.damageSeverity
   );
+  const reportSummary = {
+    bookings: reportData.vehicleUtilization.reduce((sum, vehicle) => sum + vehicle.bookings, 0),
+    distance: reportData.vehicleUtilization.reduce((sum, vehicle) => sum + vehicle.distance, 0),
+    maintenanceCost: reportData.vehicleUtilization.reduce((sum, vehicle) => sum + vehicle.maintenanceCost, 0),
+    damages: reportData.damageBySeverity.reduce((sum, row) => sum + row.count, 0)
+  };
 
   return (
     <div className="grid gap-6">
@@ -140,6 +147,13 @@ export default async function ReportsPage({
         </CardContent>
       </Card>
 
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <ReportSummary label="Buchungen" value={reportSummary.bookings.toLocaleString("de-DE")} />
+        <ReportSummary label="Kilometer" value={`${reportSummary.distance.toLocaleString("de-DE")} km`} />
+        <ReportSummary label="Wartungskosten" value={formatCurrency(reportSummary.maintenanceCost)} />
+        <ReportSummary label="Schäden" value={reportSummary.damages.toLocaleString("de-DE")} />
+      </div>
+
       <div className="flex flex-wrap gap-2">
         {exportTypes.map((type) => (
           <Button key={type} asChild variant="outline" size="sm">
@@ -174,6 +188,15 @@ export default async function ReportsPage({
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function ReportSummary({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border bg-white p-4">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="mt-2 text-xl font-semibold">{value}</p>
     </div>
   );
 }

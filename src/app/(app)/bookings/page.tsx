@@ -22,12 +22,15 @@ export const metadata = {
 export default async function BookingsPage({ searchParams }: { searchParams: { status?: BookingStatus } }) {
   const user = await requireAuth();
   const manager = isFleetAdmin(user.role);
-  const [bookings, vehicles] = await Promise.all([
+  const bookingScopeWhere = {
+    companyId: user.companyId,
+    userId: manager ? undefined : user.id
+  };
+  const [bookings, vehicles, bookingStatusRows] = await Promise.all([
     prisma.booking.findMany({
       where: {
-        companyId: user.companyId,
-        status: searchParams.status,
-        userId: manager ? undefined : user.id
+        ...bookingScopeWhere,
+        status: searchParams.status
       },
       include: { vehicle: true, user: true, approvedBy: true, rejectedBy: true },
       orderBy: { startAt: "desc" }
@@ -35,9 +38,16 @@ export default async function BookingsPage({ searchParams }: { searchParams: { s
     prisma.vehicle.findMany({
       where: { companyId: user.companyId, status: { not: "RETIRED" } },
       orderBy: { licensePlate: "asc" }
+    }),
+    prisma.booking.groupBy({
+      by: ["status"],
+      where: bookingScopeWhere,
+      _count: { _all: true }
     })
   ]);
   const hasFilters = Boolean(searchParams.status);
+  const statusCounts = new Map(bookingStatusRows.map((row) => [row.status, row._count._all]));
+  const allBookingsCount = bookingStatusRows.reduce((sum, row) => sum + row._count._all, 0);
 
   return (
     <div className="grid gap-6">
@@ -57,6 +67,18 @@ export default async function BookingsPage({ searchParams }: { searchParams: { s
             <CardTitle>Buchungshistorie</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="sm" variant={!searchParams.status ? "default" : "outline"}>
+                <Link href="/bookings">Alle ({allBookingsCount})</Link>
+              </Button>
+              {Object.values(BookingStatus).map((status) => (
+                <Button key={status} asChild size="sm" variant={searchParams.status === status ? "default" : "outline"}>
+                  <Link href={`/bookings?status=${status}`}>
+                    {bookingStatusLabels[status]} ({statusCounts.get(status) ?? 0})
+                  </Link>
+                </Button>
+              ))}
+            </div>
             <form className="flex flex-wrap gap-3">
               <SelectField name="status" defaultValue={searchParams.status ?? ""} className="max-w-56">
                 <option value="">Alle Status</option>

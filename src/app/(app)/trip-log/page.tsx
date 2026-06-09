@@ -1,4 +1,6 @@
-import { TripType } from "@prisma/client";
+import { Prisma, TripType } from "@prisma/client";
+import { startOfDay, subDays } from "date-fns";
+import Link from "next/link";
 import { EmptyState } from "@/components/app/empty-state";
 import { PageHeader } from "@/components/app/page-header";
 import { correctTripLog, finishTrip, startTrip } from "@/server/actions";
@@ -18,15 +20,37 @@ export const metadata = {
   title: "Fahrtenbuch"
 };
 
-export default async function TripLogPage() {
+export default async function TripLogPage({ searchParams }: { searchParams: { view?: string } }) {
   const user = await requireAuth();
   const manager = isFleetAdmin(user.role);
-  const [trips, vehicles, approvedBookings] = await Promise.all([
+  const view = ["active", "today", "week"].includes(searchParams.view ?? "") ? searchParams.view : "";
+  const today = startOfDay(new Date());
+  const weekStart = subDays(today, 7);
+  const baseTripWhere: Prisma.TripLogWhereInput = {
+    companyId: user.companyId,
+    userId: manager ? undefined : user.id
+  };
+  const tripWhere: Prisma.TripLogWhereInput = {
+    ...baseTripWhere,
+    ...(view === "active" ? { endAt: null } : {}),
+    ...(view === "today" ? { startAt: { gte: today } } : {}),
+    ...(view === "week" ? { startAt: { gte: weekStart } } : {})
+  };
+  const [trips, activeTrips, allTripsCount, activeTripsCount, todayTripsCount, weekTripsCount, vehicles, approvedBookings] = await Promise.all([
     prisma.tripLog.findMany({
-      where: { companyId: user.companyId, userId: manager ? undefined : user.id },
+      where: tripWhere,
       include: { vehicle: true, user: true, booking: true },
       orderBy: { startAt: "desc" }
     }),
+    prisma.tripLog.findMany({
+      where: { ...baseTripWhere, endAt: null },
+      include: { vehicle: true, user: true },
+      orderBy: { startAt: "desc" }
+    }),
+    prisma.tripLog.count({ where: baseTripWhere }),
+    prisma.tripLog.count({ where: { ...baseTripWhere, endAt: null } }),
+    prisma.tripLog.count({ where: { ...baseTripWhere, startAt: { gte: today } } }),
+    prisma.tripLog.count({ where: { ...baseTripWhere, startAt: { gte: weekStart } } }),
     prisma.vehicle.findMany({
       where: { companyId: user.companyId, status: { not: "RETIRED" } },
       orderBy: { licensePlate: "asc" }
@@ -42,8 +66,12 @@ export default async function TripLogPage() {
       take: 20
     })
   ]);
-
-  const activeTrips = trips.filter((trip) => !trip.endAt);
+  const viewTabs = [
+    { label: "Alle", href: "/trip-log", active: !view, count: allTripsCount },
+    { label: "Aktiv", href: "/trip-log?view=active", active: view === "active", count: activeTripsCount },
+    { label: "Heute", href: "/trip-log?view=today", active: view === "today", count: todayTripsCount },
+    { label: "7 Tage", href: "/trip-log?view=week", active: view === "week", count: weekTripsCount }
+  ];
 
   return (
     <div className="grid gap-6">
@@ -70,7 +98,16 @@ export default async function TripLogPage() {
             <CardTitle>Fahrten</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="mb-4 flex justify-end">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap gap-2">
+                {viewTabs.map((tab) => (
+                  <Button key={tab.href} asChild size="sm" variant={tab.active ? "default" : "outline"}>
+                    <Link href={tab.href}>
+                      {tab.label} ({tab.count})
+                    </Link>
+                  </Button>
+                ))}
+              </div>
               <Button asChild variant="outline" size="sm">
                 <a href="/api/export/trip-logs">CSV exportieren</a>
               </Button>

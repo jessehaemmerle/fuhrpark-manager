@@ -43,23 +43,34 @@ export default async function VehiclesPage({
   const orderBy: Prisma.VehicleOrderByWithRelationInput =
     searchParams.sort === "mileage" ? { mileage: "desc" } : searchParams.sort === "plate" ? { licensePlate: "asc" } : { updatedAt: "desc" };
 
-  const vehicles = await prisma.vehicle.findMany({
-    where,
-    include: {
-      bookings: {
-        where: { status: { in: ["PENDING", "APPROVED"] } },
-        orderBy: { startAt: "asc" },
-        take: 1
+  const [vehicles, vehicleStatusRows] = await Promise.all([
+    prisma.vehicle.findMany({
+      where,
+      include: {
+        bookings: {
+          where: { status: { in: ["PENDING", "APPROVED"] } },
+          orderBy: { startAt: "asc" },
+          take: 1
+        },
+        maintenanceRecords: {
+          where: { status: { in: ["PLANNED", "IN_PROGRESS"] } },
+          orderBy: { startAt: "asc" },
+          take: 1
+        }
       },
-      maintenanceRecords: {
-        where: { status: { in: ["PLANNED", "IN_PROGRESS"] } },
-        orderBy: { startAt: "asc" },
-        take: 1
-      }
-    },
-    orderBy
-  });
+      orderBy
+    }),
+    prisma.vehicle.groupBy({
+      by: ["status"],
+      where: { companyId: user.companyId, status: { not: VehicleStatus.RETIRED } },
+      _count: { _all: true }
+    })
+  ]);
   const hasFilters = Boolean(searchParams.q || searchParams.status || searchParams.category || searchParams.sort);
+  const statusCounts = new Map(vehicleStatusRows.map((row) => [row.status, row._count._all]));
+  const activeVehicleCount = vehicleStatusRows.reduce((sum, row) => sum + row._count._all, 0);
+  const availableVehicleCount = statusCounts.get(VehicleStatus.AVAILABLE) ?? 0;
+  const fleetReadiness = activeVehicleCount > 0 ? Math.round((availableVehicleCount / activeVehicleCount) * 100) : 0;
 
   return (
     <div className="grid gap-6">
@@ -75,6 +86,32 @@ export default async function VehiclesPage({
           </Button>
         }
       />
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+        <Link href="/vehicles" className="rounded-md border bg-white p-4 text-sm transition-colors hover:bg-zinc-50">
+          <p className="text-muted-foreground">Aktive Fahrzeuge</p>
+          <p className="mt-2 text-2xl font-semibold">{activeVehicleCount}</p>
+        </Link>
+        <div className="rounded-md border bg-white p-4 text-sm">
+          <p className="text-muted-foreground">Verfügbarkeitsquote</p>
+          <p className="mt-2 text-2xl font-semibold">{fleetReadiness}%</p>
+        </div>
+        {Object.values(VehicleStatus)
+          .filter((status) => status !== VehicleStatus.RETIRED)
+          .map((status) => (
+            <Link
+              key={status}
+              href={`/vehicles?status=${status}`}
+              className="rounded-md border bg-white p-4 text-sm transition-colors hover:bg-zinc-50"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-muted-foreground">{vehicleStatusLabels[status]}</p>
+                <Badge tone={statusTone(status)}>{statusCounts.get(status) ?? 0}</Badge>
+              </div>
+              <p className="mt-2 text-2xl font-semibold">{statusCounts.get(status) ?? 0}</p>
+            </Link>
+          ))}
+      </div>
 
       <Card>
         <CardContent className="pt-5">

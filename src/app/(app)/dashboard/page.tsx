@@ -1,7 +1,9 @@
 import {
   AlertTriangle,
+  ArrowRight,
   CalendarCheck,
   Car,
+  CheckCircle2,
   Gauge,
   ShieldAlert,
   TrendingUp,
@@ -35,6 +37,45 @@ export default async function DashboardPage() {
     { name: "Fahrten", value: data.metrics.activeTrips },
     { name: "Schäden", value: data.metrics.openDamageReports }
   ];
+  const canManageUsers = user.role === "OWNER" || user.role === "PLATFORM_ADMIN";
+  const actionItems = [
+    {
+      label: "Buchungen freigeben",
+      description: "Offene Anfragen warten auf Entscheidung.",
+      count: data.metrics.pendingBookings,
+      href: "/bookings?status=PENDING",
+      tone: "warning" as const
+    },
+    {
+      label: "Schäden prüfen",
+      description: "Offene Meldungen brauchen Status oder Reparaturplanung.",
+      count: data.metrics.openDamageReports,
+      href: "/damage-reports?status=OPEN",
+      tone: "danger" as const
+    },
+    {
+      label: "Wartung koordinieren",
+      description: "Geplante oder laufende Wartungen in den nächsten 30 Tagen.",
+      count: data.metrics.upcomingMaintenanceCount,
+      href: "/maintenance",
+      tone: "warning" as const
+    },
+    {
+      label: "Aktive Fahrten beobachten",
+      description: "Nicht abgeschlossene Fahrten im Fahrtenbuch.",
+      count: data.metrics.activeTrips,
+      href: "/trip-log?view=active",
+      tone: "neutral" as const
+    },
+    {
+      label: "Fahrerlaubnisse aktualisieren",
+      description: "Fahrerfreigaben laufen bald ab.",
+      count: data.metrics.expiringDrivers,
+      href: canManageUsers ? "/users" : "/dashboard",
+      tone: "warning" as const
+    }
+  ];
+  const visibleActionItems = actionItems.filter((item) => item.count > 0);
 
   return (
     <div className="grid gap-6">
@@ -68,6 +109,33 @@ export default async function DashboardPage() {
         <MetricCard label="Wartungskosten Monat" value={formatCurrency(data.metrics.maintenanceCostsThisMonth)} icon={Wrench} />
         <MetricCard label="Fahrerlaubnis läuft ab" value={data.metrics.expiringDrivers} icon={ShieldAlert} />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Heute wichtig</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {visibleActionItems.map((item) => (
+            <Link key={item.label} href={item.href} className="group rounded-md border p-4 text-sm transition-colors hover:bg-zinc-50">
+              <div className="flex items-start justify-between gap-3">
+                <Badge tone={item.tone}>{item.count}</Badge>
+                <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
+              </div>
+              <p className="mt-3 font-semibold">{item.label}</p>
+              <p className="mt-1 text-muted-foreground">{item.description}</p>
+            </Link>
+          ))}
+          {visibleActionItems.length === 0 ? (
+            <div className="rounded-md border bg-emerald-50 p-4 text-sm text-emerald-900 md:col-span-2 xl:col-span-5">
+              <div className="flex items-center gap-2 font-semibold">
+                <CheckCircle2 className="h-4 w-4" aria-hidden />
+                Keine akuten Aufgaben
+              </div>
+              <p className="mt-1 text-emerald-800">Buchungen, Schäden, Wartungen und Fahrerfreigaben sehen aktuell ruhig aus.</p>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <Card>

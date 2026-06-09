@@ -3,6 +3,7 @@ import { Car } from "lucide-react";
 import { differenceInCalendarDays } from "date-fns";
 import { AppNavigation } from "@/components/app/app-nav";
 import { LogoutButton } from "@/components/app/logout-button";
+import { QuickActions } from "@/components/app/quick-actions";
 import { Badge } from "@/components/ui/badge";
 import { type AuthenticatedUser, isFleetAdmin } from "@/lib/auth";
 import { roleLabels, tierLabels } from "@/lib/labels";
@@ -46,6 +47,7 @@ export function AppShell({ user, children }: { user: AuthenticatedUser; children
               {isFleetAdmin(user.role) ? <Badge tone="success">Managerzugriff</Badge> : <Badge>Nutzer</Badge>}
               <LogoutButton />
             </div>
+            <QuickActions role={user.role} />
             <AppNavigation role={user.role} variant="mobile" />
           </div>
         </header>
