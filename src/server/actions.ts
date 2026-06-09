@@ -24,7 +24,7 @@ import { assertValidTimeRange, assertVehicleAvailability, findActiveTripConflict
 import { assertFeatureAccess, assertWithinPlan, getPlan } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 import { normalizePhotoUrls, validatePhotoUrls } from "@/lib/upload";
-import { toFormDataObject } from "@/lib/utils";
+import { slugify, toFormDataObject } from "@/lib/utils";
 import {
   bookingDecisionSchema,
   bookingSchema,
@@ -38,6 +38,8 @@ import {
   idSchema,
   maintenanceSchema,
   maintenanceStatusSchema,
+  platformCompanyCreateSchema,
+  platformCompanyUpdateSchema,
   platformLicenseCreateSchema,
   platformLicenseIdSchema,
   platformLicenseUpdateSchema,
@@ -73,7 +75,33 @@ async function uniqueLicenseKey() {
   throw new Error("Lizenzschluessel konnte nicht erzeugt werden.");
 }
 
-async function syncCompanyFromLatestActiveLicense(companyId: string, actorCompanyId: string) {
+async function uniqueCompanySlug(companyName: string) {
+  const base = slugify(companyName) || "firma";
+  let slug = base;
+  let suffix = 2;
+
+  while (await prisma.company.findUnique({ where: { slug }, select: { id: true } })) {
+    slug = `${base}-${suffix}`;
+    suffix += 1;
+  }
+
+  return slug;
+}
+
+function futureDateFromDays(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
+async function syncCompanyFromLatestActiveLicense(companyId: string) {
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { id: true, isPlatformCompany: true }
+  });
+
+  if (!company || company.isPlatformCompany) return;
+
   const activeLicense = await prisma.license.findFirst({
     where: { companyId, status: "ACTIVE" },
     orderBy: [{ validUntil: "desc" }, { createdAt: "desc" }]
@@ -91,12 +119,10 @@ async function syncCompanyFromLatestActiveLicense(companyId: string, actorCompan
     return;
   }
 
-  if (companyId !== actorCompanyId) {
-    await prisma.company.update({
-      where: { id: companyId },
-      data: { active: false }
-    });
-  }
+  await prisma.company.update({
+    where: { id: companyId },
+    data: { active: false }
+  });
 }
 
 const directBookingStatuses = [BookingStatus.CANCELLED, BookingStatus.COMPLETED] as const;
@@ -982,10 +1008,89 @@ export async function updateCompanySettings(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+export async function createPlatformCompany(formData: FormData) {
+  const actor = await requireRole(["PLATFORM_ADMIN"]);
+  const data = parseForm(platformCompanyCreateSchema, formData);
+  const slug = await uniqueCompanySlug(data.name);
+  const trialStartDate = new Date();
+  const company = await prisma.company.create({
+    data: {
+      name: data.name,
+      slug,
+      address: data.address ?? null,
+      country: data.country,
+      contactEmail: data.contactEmail,
+      contactPhone: data.contactPhone ?? null,
+      primaryBrandColor: data.primaryBrandColor,
+      subscriptionTier: data.subscriptionTier,
+      trialStartDate,
+      trialEndDate: futureDateFromDays(data.trialDays),
+      active: data.active,
+      isPlatformCompany: false
+    }
+  });
+
+  await writeAuditLog({
+    companyId: company.id,
+    actorUserId: actor.id,
+    action: "platform.company_created",
+    entityType: "Company",
+    entityId: company.id,
+    metadata: {
+      slug: company.slug,
+      tier: company.subscriptionTier,
+      active: company.active,
+      source: "platform_admin"
+    }
+  });
+
+  revalidatePath("/admin");
+}
+
+export async function updatePlatformCompany(formData: FormData) {
+  const actor = await requireRole(["PLATFORM_ADMIN"]);
+  const data = parseForm(platformCompanyUpdateSchema, formData);
+  const existing = await prisma.company.findFirstOrThrow({
+    where: { id: data.companyId, isPlatformCompany: false }
+  });
+
+  const company = await prisma.company.update({
+    where: { id: existing.id },
+    data: {
+      name: data.name,
+      address: data.address ?? null,
+      country: data.country,
+      contactEmail: data.contactEmail,
+      contactPhone: data.contactPhone ?? null,
+      primaryBrandColor: data.primaryBrandColor,
+      subscriptionTier: data.subscriptionTier,
+      trialEndDate: data.trialEndDate,
+      active: data.active
+    }
+  });
+
+  await writeAuditLog({
+    companyId: company.id,
+    actorUserId: actor.id,
+    action: "platform.company_updated",
+    entityType: "Company",
+    entityId: company.id,
+    metadata: {
+      fromTier: existing.subscriptionTier,
+      toTier: company.subscriptionTier,
+      active: company.active
+    }
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/subscription");
+  revalidatePath("/dashboard");
+}
+
 export async function createPlatformLicense(formData: FormData) {
   const actor = await requireRole(["PLATFORM_ADMIN"]);
   const data = parseForm(platformLicenseCreateSchema, formData);
-  const company = await prisma.company.findUniqueOrThrow({ where: { id: data.companyId } });
+  const company = await prisma.company.findFirstOrThrow({ where: { id: data.companyId, isPlatformCompany: false } });
   const licenseKey = await uniqueLicenseKey();
   const initialUserPasswordHash =
     data.createInitialUser && data.initialUserTemporaryPassword ? await hashPassword(data.initialUserTemporaryPassword) : null;
@@ -1025,7 +1130,7 @@ export async function createPlatformLicense(formData: FormData) {
     return { license, initialUser };
   });
 
-  await syncCompanyFromLatestActiveLicense(company.id, actor.companyId);
+  await syncCompanyFromLatestActiveLicense(company.id);
   await writeAuditLog({
     companyId: company.id,
     actorUserId: actor.id,
@@ -1062,7 +1167,10 @@ export async function createPlatformLicense(formData: FormData) {
 export async function updatePlatformLicense(formData: FormData) {
   const actor = await requireRole(["PLATFORM_ADMIN"]);
   const data = parseForm(platformLicenseUpdateSchema, formData);
-  const existing = await prisma.license.findUniqueOrThrow({ where: { id: data.licenseId } });
+  const existing = await prisma.license.findFirstOrThrow({
+    where: { id: data.licenseId, company: { isPlatformCompany: false } }
+  });
+  await prisma.company.findFirstOrThrow({ where: { id: data.companyId, isPlatformCompany: false }, select: { id: true } });
   const license = await prisma.license.update({
     where: { id: existing.id },
     data: {
@@ -1079,9 +1187,9 @@ export async function updatePlatformLicense(formData: FormData) {
     }
   });
 
-  await syncCompanyFromLatestActiveLicense(existing.companyId, actor.companyId);
+  await syncCompanyFromLatestActiveLicense(existing.companyId);
   if (license.companyId !== existing.companyId) {
-    await syncCompanyFromLatestActiveLicense(license.companyId, actor.companyId);
+    await syncCompanyFromLatestActiveLicense(license.companyId);
   }
   await writeAuditLog({
     companyId: license.companyId,
@@ -1103,15 +1211,18 @@ export async function updatePlatformLicense(formData: FormData) {
 export async function archivePlatformLicense(formData: FormData) {
   const actor = await requireRole(["PLATFORM_ADMIN"]);
   const data = parseForm(platformLicenseIdSchema, formData);
+  const existing = await prisma.license.findFirstOrThrow({
+    where: { id: data.licenseId, company: { isPlatformCompany: false } }
+  });
   const license = await prisma.license.update({
-    where: { id: data.licenseId },
+    where: { id: existing.id },
     data: {
       status: "ARCHIVED",
       archivedAt: new Date()
     }
   });
 
-  await syncCompanyFromLatestActiveLicense(license.companyId, actor.companyId);
+  await syncCompanyFromLatestActiveLicense(license.companyId);
   await writeAuditLog({
     companyId: license.companyId,
     actorUserId: actor.id,
@@ -1128,9 +1239,11 @@ export async function archivePlatformLicense(formData: FormData) {
 export async function deletePlatformLicense(formData: FormData) {
   const actor = await requireRole(["PLATFORM_ADMIN"]);
   const data = parseForm(platformLicenseIdSchema, formData);
-  const license = await prisma.license.findUniqueOrThrow({ where: { id: data.licenseId } });
+  const license = await prisma.license.findFirstOrThrow({
+    where: { id: data.licenseId, company: { isPlatformCompany: false } }
+  });
   await prisma.license.delete({ where: { id: license.id } });
-  await syncCompanyFromLatestActiveLicense(license.companyId, actor.companyId);
+  await syncCompanyFromLatestActiveLicense(license.companyId);
   await writeAuditLog({
     companyId: license.companyId,
     actorUserId: actor.id,
@@ -1154,6 +1267,12 @@ export async function updatePlatformUserAccess(formData: FormData) {
 
   if (target.id === actor.id && !data.active) {
     throw new Error("Sie koennen den eigenen Super-Admin-Zugang nicht deaktivieren.");
+  }
+  if (!target.company.isPlatformCompany && data.role === "PLATFORM_ADMIN") {
+    throw new Error("Super-Admin-Rollen duerfen nicht an Mandanten gebunden werden.");
+  }
+  if (target.company.isPlatformCompany && data.role !== "PLATFORM_ADMIN") {
+    throw new Error("Plattformzugänge muessen Super-Admin-Rollen behalten.");
   }
 
   await prisma.user.update({

@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Der Reset-Link ist ungueltig oder abgelaufen." }, { status: 400 });
     }
 
-    if (!user.active || !user.company.active) {
+    if (!user.active || (!user.company.active && user.role !== "PLATFORM_ADMIN")) {
       return NextResponse.json({ error: "Dieses Konto ist nicht aktiv." }, { status: 403 });
     }
 

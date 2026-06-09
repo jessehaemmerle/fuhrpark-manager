@@ -206,6 +206,28 @@ export const platformUserAccessSchema = z.object({
   password: z.preprocess((value) => (value === "" ? undefined : value), passwordSchema.optional())
 });
 
+const companyBaseShape = {
+  name: requiredText("Firmenname"),
+  address: optionalText,
+  country: z.string().trim().min(2).max(2).default("DE"),
+  contactEmail: z.string().trim().email("Bitte gueltige E-Mail eingeben.").toLowerCase(),
+  contactPhone: optionalShortText,
+  primaryBrandColor: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, "Bitte Hex-Farbe eingeben."),
+  subscriptionTier: z.nativeEnum(SubscriptionTier),
+  active: checkbox.default(false)
+};
+
+export const platformCompanyCreateSchema = z.object({
+  ...companyBaseShape,
+  trialDays: z.coerce.number().int().min(0).max(3650).default(14)
+});
+
+export const platformCompanyUpdateSchema = z.object({
+  ...companyBaseShape,
+  companyId: idSchema,
+  trialEndDate: z.coerce.date()
+});
+
 const optionalPositiveInt = z.preprocess(
   (value) => (value === "" || value === null ? undefined : value),
   z.coerce.number().int().min(1).optional()

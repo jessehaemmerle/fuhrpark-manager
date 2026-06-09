@@ -68,7 +68,8 @@ async function main() {
       subscriptionTier: "ENTERPRISE",
       trialEndDate: addDays(new Date(), 365),
       primaryBrandColor: "#0f766e",
-      country: "DE"
+      country: "DE",
+      isPlatformCompany: true
     }
   });
 

@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       include: { company: true }
     });
 
-    if (!user || !user.active || !user.company.active) {
+    if (!user || !user.active || (!user.company.active && user.role !== "PLATFORM_ADMIN")) {
       return NextResponse.json(genericResponse);
     }
 

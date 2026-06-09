@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { KeyRound, LayoutDashboard, Shield } from "lucide-react";
+import { KeyRound, Shield } from "lucide-react";
 import { LogoutButton } from "@/components/app/logout-button";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { requireRole } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -25,11 +24,7 @@ export default async function PlatformAdminLayout({ children }: { children: Reac
         <nav className="grid gap-1">
           <Link href="/admin" className="flex items-center gap-3 rounded-md bg-zinc-100 px-3 py-2 text-sm font-medium">
             <KeyRound className="h-4 w-4" aria-hidden />
-            Lizenzen & Zugänge
-          </Link>
-          <Link href="/dashboard" className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100">
-            <LayoutDashboard className="h-4 w-4" aria-hidden />
-            Mandanten-App
+            Mandanten, Lizenzen & Zugänge
           </Link>
         </nav>
         <div className="mt-auto rounded-md border bg-zinc-50 p-3 text-sm">
@@ -46,17 +41,11 @@ export default async function PlatformAdminLayout({ children }: { children: Reac
             </div>
             <div className="flex items-center gap-2">
               <Badge tone="success">Super Admin</Badge>
-              <Button asChild variant="outline" size="sm">
-                <Link href="/dashboard">App</Link>
-              </Button>
               <LogoutButton />
             </div>
             <nav className="flex w-full gap-2 overflow-x-auto md:hidden">
               <Link href="/admin" className="whitespace-nowrap rounded-md bg-zinc-900 px-3 py-2 text-xs text-white">
-                Lizenzen
-              </Link>
-              <Link href="/dashboard" className="whitespace-nowrap rounded-md bg-zinc-100 px-3 py-2 text-xs">
-                App
+                Plattformverwaltung
               </Link>
             </nav>
           </div>

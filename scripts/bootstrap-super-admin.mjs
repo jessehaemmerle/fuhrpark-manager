@@ -42,7 +42,8 @@ async function main() {
       contactEmail: email,
       country: "AT",
       subscriptionTier: "ENTERPRISE",
-      trialEndDate: futureDate(3650)
+      trialEndDate: futureDate(3650),
+      isPlatformCompany: true
     },
     create: {
       name: "Fleetbase Operations",
@@ -52,7 +53,8 @@ async function main() {
       trialEndDate: futureDate(3650),
       primaryBrandColor: "#0f766e",
       country: "AT",
-      active: true
+      active: true,
+      isPlatformCompany: true
     }
   });
 

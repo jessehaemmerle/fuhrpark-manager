@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "E-Mail oder Passwort ist falsch." }, { status: 401 });
     }
 
-    if (!user.active || !user.company.active) {
+    if (!user.active || (!user.company.active && user.role !== "PLATFORM_ADMIN")) {
       return NextResponse.json({ error: "Dieses Konto ist nicht aktiv." }, { status: 403 });
     }
 

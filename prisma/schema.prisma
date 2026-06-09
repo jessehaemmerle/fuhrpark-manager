@@ -119,6 +119,7 @@ model Company {
   trialStartDate         DateTime           @default(now())
   trialEndDate           DateTime
   active                 Boolean            @default(true)
+  isPlatformCompany      Boolean            @default(false)
   retentionPeriodDays    Int                @default(3650)
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
@@ -136,6 +137,7 @@ model Company {
 
   @@index([subscriptionTier])
   @@index([active])
+  @@index([isPlatformCompany])
 }
 
 model License {

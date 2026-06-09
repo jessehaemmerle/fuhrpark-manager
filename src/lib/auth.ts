@@ -144,7 +144,8 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
       }
     });
 
-    if (!user?.active || !user.company.active) return null;
+    if (!user?.active) return null;
+    if (!user.company.active && user.role !== "PLATFORM_ADMIN") return null;
     return user;
   } catch {
     return null;
