@@ -1,12 +1,24 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/auth/login-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCurrentUser } from "@/lib/auth";
 
 export const metadata = {
   title: "Login"
 };
 
-export default function LoginPage() {
+function redirectPathForUser(user: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>, next?: string) {
+  if (user.mustChangePassword) return "/set-password";
+  if (user.role === "PLATFORM_ADMIN") return "/admin";
+  if (next?.startsWith("/") && !next.startsWith("//")) return next;
+  return "/dashboard";
+}
+
+export default async function LoginPage({ searchParams }: { searchParams?: { next?: string } }) {
+  const user = await getCurrentUser();
+  if (user) redirect(redirectPathForUser(user, searchParams?.next));
+
   return (
     <main className="container flex min-h-[calc(100vh-8rem)] items-center justify-center py-12">
       <Card className="w-full max-w-md">
