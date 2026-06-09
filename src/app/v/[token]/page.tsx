@@ -16,7 +16,7 @@ import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
 
 export const metadata = {
-  title: "Fahrzeug QR Workflow"
+  title: "Fahrzeug QR-Workflow"
 };
 
 export default async function VehicleQrPage({ params }: { params: { token: string } }) {
@@ -29,12 +29,12 @@ export default async function VehicleQrPage({ params }: { params: { token: strin
   ]);
 
   if (!vehicle) {
-    return <QrShell title="QR-Code ungueltig" copy="Dieser Fahrzeugcode ist deaktiviert oder existiert nicht." />;
+    return <QrShell title="QR-Code ungültig" copy="Dieser Fahrzeugcode ist deaktiviert oder existiert nicht." />;
   }
 
   if (!user) {
     return (
-      <QrShell title={`${vehicle.brand} ${vehicle.model}`} copy={`${vehicle.licensePlate} · Bitte einloggen, um Aktionen auszufuehren.`}>
+      <QrShell title={`${vehicle.brand} ${vehicle.model}`} copy={`${vehicle.licensePlate} · Bitte einloggen, um Aktionen auszuführen.`}>
         <Button asChild>
           <Link href={`/login?next=/v/${params.token}`}>
             <LockKeyhole className="h-4 w-4" /> Einloggen
@@ -45,7 +45,7 @@ export default async function VehicleQrPage({ params }: { params: { token: strin
   }
 
   if (user.companyId !== vehicle.companyId && user.role !== "PLATFORM_ADMIN") {
-    return <QrShell title="Kein Zugriff" copy="Dieses Fahrzeug gehoert zu einem anderen Mandanten." />;
+    return <QrShell title="Kein Zugriff" copy="Dieses Fahrzeug gehört zu einem anderen Mandanten." />;
   }
 
   await writeAuditLog({
@@ -158,14 +158,14 @@ export default async function VehicleQrPage({ params }: { params: { token: strin
                 ))}
               </SelectBlock>
               <TextBlock name="photoUrls" label="Foto-URLs" />
-              <Button>Melden</Button>
+              <Button>Schaden melden</Button>
             </form>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Uebergabe / Rueckgabe</CardTitle>
+            <CardTitle>Übergabe / Rückgabe</CardTitle>
           </CardHeader>
           <CardContent>
             <form action={createHandover} className="grid gap-4">
@@ -179,12 +179,12 @@ export default async function VehicleQrPage({ params }: { params: { token: strin
               </SelectBlock>
               <Field name="handledAt" label="Zeitpunkt" type="datetime-local" defaultValue={nowInput} />
               <Field name="mileage" label="Kilometerstand" type="number" />
-              <Field name="energyLevel" label="Tank/Batterie %" type="number" />
-              <TextBlock name="exteriorConditionNote" label="Aussen-Zustand" />
-              <TextBlock name="interiorConditionNote" label="Innen-Zustand" />
+              <Field name="energyLevel" label="Tank/Batterie (%)" type="number" />
+              <TextBlock name="exteriorConditionNote" label="Außenzustand" />
+              <TextBlock name="interiorConditionNote" label="Innenzustand" />
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" name="existingDamageConfirmed" />
-                Bestehende Schaeden bestaetigt
+                Bestehende Schäden bestätigt
               </label>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" name="newDamageReported" />

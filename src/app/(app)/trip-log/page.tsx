@@ -1,4 +1,6 @@
 import { TripType } from "@prisma/client";
+import { EmptyState } from "@/components/app/empty-state";
+import { PageHeader } from "@/components/app/page-header";
 import { correctTripLog, finishTrip, startTrip } from "@/server/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,85 +47,141 @@ export default async function TripLogPage() {
 
   return (
     <div className="grid gap-6">
-      <div>
-        <p className="text-sm font-semibold uppercase text-primary">Digitales Fahrtenbuch</p>
-        <h1 className="mt-2 text-3xl font-semibold">Fahrtenbuch</h1>
-        <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+      <PageHeader
+        eyebrow="Digitales Fahrtenbuch"
+        title="Fahrtenbuch"
+        description={
+          <>
           Fahrtdaten werden zur Fuhrparkabrechnung, steuerlichen Dokumentation und Fahrzeugnutzung erhoben. Zugriff ist
-          rollenbasiert beschraenkt; abgeschlossene Fahrten werden nicht still veraendert, sondern mit Korrekturhinweisen
+          rollenbasiert beschränkt; abgeschlossene Fahrten werden nicht still verändert, sondern mit Korrekturhinweisen
           dokumentiert.
-        </p>
-      </div>
+          </>
+        }
+        actions={
+          <Button asChild>
+            <a href="#start-trip">Fahrt starten</a>
+          </Button>
+        }
+      />
 
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <Card>
           <CardHeader>
             <CardTitle>Fahrten</CardTitle>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
+          <CardContent>
             <div className="mb-4 flex justify-end">
               <Button asChild variant="outline" size="sm">
                 <a href="/api/export/trip-logs">CSV exportieren</a>
               </Button>
             </div>
-            <table className="w-full min-w-[960px] text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="py-3 pr-4">Fahrzeug</th>
-                  <th className="py-3 pr-4">Fahrer</th>
-                  <th className="py-3 pr-4">Zeitraum</th>
-                  <th className="py-3 pr-4">Kilometer</th>
-                  <th className="py-3 pr-4">Zweck</th>
-                  <th className="py-3 pr-4">Status</th>
-                  <th className="py-3 pr-4">Aktion</th>
-                </tr>
-              </thead>
-              <tbody>
-                {trips.map((trip) => (
-                  <tr key={trip.id} className="border-b last:border-0">
-                    <td className="py-3 pr-4 font-medium">{trip.vehicle.licensePlate}</td>
-                    <td className="py-3 pr-4">{trip.user.name}</td>
-                    <td className="py-3 pr-4">
-                      {formatDateTime(trip.startAt)} bis {formatDateTime(trip.endAt)}
-                    </td>
-                    <td className="py-3 pr-4">
-                      {trip.startMileage} - {trip.endMileage ?? "..."} ({trip.distance ?? 0} km)
-                    </td>
-                    <td className="py-3 pr-4">
-                      {trip.purpose}
-                      <div className="text-xs text-muted-foreground">{tripTypeLabels[trip.tripType]}</div>
-                    </td>
-                    <td className="py-3 pr-4">
-                      <Badge tone={trip.endAt ? "success" : "warning"}>{trip.endAt ? "Abgeschlossen" : "Aktiv"}</Badge>
-                    </td>
-                    <td className="py-3 pr-4">
-                      <div className="grid gap-2">
-                        {!trip.endAt ? (
-                          <form action={finishTrip} className="flex flex-wrap gap-2">
-                            <input type="hidden" name="tripLogId" value={trip.id} />
-                            <Input className="w-32" name="endMileage" type="number" placeholder="End-km" required />
-                            <Button size="sm">Beenden</Button>
-                          </form>
-                        ) : null}
-                        {manager && trip.endAt ? (
-                          <form action={correctTripLog} className="flex flex-wrap gap-2">
-                            <input type="hidden" name="tripLogId" value={trip.id} />
-                            <Input className="w-56" name="correctionNote" placeholder="Korrekturhinweis" required />
-                            <Button size="sm" variant="outline">Notiz</Button>
-                          </form>
-                        ) : null}
-                      </div>
-                    </td>
+            <div className="grid gap-3 md:hidden">
+              {trips.map((trip) => (
+                <div key={trip.id} className="rounded-md border p-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold">{trip.vehicle.licensePlate}</p>
+                      <p className="mt-1 text-muted-foreground">{trip.user.name}</p>
+                    </div>
+                    <Badge tone={trip.endAt ? "success" : "warning"}>{trip.endAt ? "Abgeschlossen" : "Aktiv"}</Badge>
+                  </div>
+                  <p className="mt-3 text-muted-foreground">
+                    {formatDateTime(trip.startAt)} bis {formatDateTime(trip.endAt)}
+                  </p>
+                  <p className="mt-2">
+                    {trip.startMileage} - {trip.endMileage ?? "..."} km · {trip.distance ?? 0} km Strecke
+                  </p>
+                  <p className="mt-2 font-medium">{trip.purpose}</p>
+                  <p className="text-xs text-muted-foreground">{tripTypeLabels[trip.tripType]}</p>
+                  <div className="mt-3 grid gap-2">
+                    {!trip.endAt ? (
+                      <form action={finishTrip} className="flex flex-wrap gap-2">
+                        <input type="hidden" name="tripLogId" value={trip.id} />
+                        <Input className="min-w-0 flex-1" name="endMileage" type="number" placeholder="End-km" required />
+                        <Button size="sm">Beenden</Button>
+                      </form>
+                    ) : null}
+                    {manager && trip.endAt ? (
+                      <form action={correctTripLog} className="grid gap-2">
+                        <input type="hidden" name="tripLogId" value={trip.id} />
+                        <Input name="correctionNote" placeholder="Korrekturhinweis" required />
+                        <Button size="sm" variant="outline">Notiz speichern</Button>
+                      </form>
+                    ) : null}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[960px] text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="py-3 pr-4">Fahrzeug</th>
+                    <th className="py-3 pr-4">Fahrer</th>
+                    <th className="py-3 pr-4">Zeitraum</th>
+                    <th className="py-3 pr-4">Kilometer</th>
+                    <th className="py-3 pr-4">Zweck</th>
+                    <th className="py-3 pr-4">Status</th>
+                    <th className="py-3 pr-4">Aktion</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            {trips.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">Keine Fahrten.</p> : null}
+                </thead>
+                <tbody>
+                  {trips.map((trip) => (
+                    <tr key={trip.id} className="border-b last:border-0">
+                      <td className="py-3 pr-4 font-medium">{trip.vehicle.licensePlate}</td>
+                      <td className="py-3 pr-4">{trip.user.name}</td>
+                      <td className="py-3 pr-4">
+                        {formatDateTime(trip.startAt)} bis {formatDateTime(trip.endAt)}
+                      </td>
+                      <td className="py-3 pr-4">
+                        {trip.startMileage} - {trip.endMileage ?? "..."} ({trip.distance ?? 0} km)
+                      </td>
+                      <td className="py-3 pr-4">
+                        {trip.purpose}
+                        <div className="text-xs text-muted-foreground">{tripTypeLabels[trip.tripType]}</div>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <Badge tone={trip.endAt ? "success" : "warning"}>{trip.endAt ? "Abgeschlossen" : "Aktiv"}</Badge>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <div className="grid gap-2">
+                          {!trip.endAt ? (
+                            <form action={finishTrip} className="flex flex-wrap gap-2">
+                              <input type="hidden" name="tripLogId" value={trip.id} />
+                              <Input className="w-32" name="endMileage" type="number" placeholder="End-km" required />
+                              <Button size="sm">Beenden</Button>
+                            </form>
+                          ) : null}
+                          {manager && trip.endAt ? (
+                            <form action={correctTripLog} className="flex flex-wrap gap-2">
+                              <input type="hidden" name="tripLogId" value={trip.id} />
+                              <Input className="w-56" name="correctionNote" placeholder="Korrekturhinweis" required />
+                              <Button size="sm" variant="outline">Notiz speichern</Button>
+                            </form>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {trips.length === 0 ? (
+              <EmptyState
+                title="Keine Fahrten erfasst"
+                description="Starten Sie die erste Fahrt direkt hier oder über den QR-Code am Fahrzeug."
+                action={
+                  <Button asChild size="sm">
+                    <a href="#start-trip">Fahrt starten</a>
+                  </Button>
+                }
+              />
+            ) : null}
           </CardContent>
         </Card>
 
         <div className="grid gap-6">
-          <Card>
+          <Card id="start-trip">
             <CardHeader>
               <CardTitle>Fahrt starten</CardTitle>
             </CardHeader>

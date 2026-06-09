@@ -1,4 +1,6 @@
 import { createDepartment, deleteDepartment, updateDepartment } from "@/server/actions";
+import { EmptyState } from "@/components/app/empty-state";
+import { PageHeader } from "@/components/app/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,10 +24,16 @@ export default async function DepartmentsPage() {
 
   return (
     <div className="grid gap-6">
-      <div>
-        <p className="text-sm font-semibold uppercase text-primary">Organisation</p>
-        <h1 className="mt-2 text-3xl font-semibold">Abteilungen</h1>
-      </div>
+      <PageHeader
+        eyebrow="Organisation"
+        title="Abteilungen"
+        description="Teams strukturieren und Nutzer einfacher zuordnen."
+        actions={
+          <Button asChild>
+            <a href="#new-department">Abteilung anlegen</a>
+          </Button>
+        }
+      />
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <div className="grid gap-4 md:grid-cols-2">
           {departments.map((department) => (
@@ -39,8 +47,8 @@ export default async function DepartmentsPage() {
                   <Stat label="Aktiv" value={department.users.filter((user) => user.active).length} />
                 </div>
                 <form action={updateDepartment.bind(null, department.id)} className="grid gap-3">
-                  <Field name="name" label="Name" defaultValue={department.name} />
-                  <Field name="managerName" label="Manager" defaultValue={department.managerName ?? ""} />
+                  <Field name="name" label="Name" defaultValue={department.name} idSuffix={department.id} />
+                  <Field name="managerName" label="Manager" defaultValue={department.managerName ?? ""} idSuffix={department.id} />
                   <div className="grid gap-2">
                     <Label htmlFor={`description-${department.id}`}>Beschreibung</Label>
                     <Textarea id={`description-${department.id}`} name="description" defaultValue={department.description ?? ""} />
@@ -49,20 +57,32 @@ export default async function DepartmentsPage() {
                 </form>
                 <form action={deleteDepartment}>
                   <input type="hidden" name="departmentId" value={department.id} />
-                  <Button size="sm" variant="destructive">Loeschen</Button>
+                  <Button size="sm" variant="destructive">Löschen</Button>
                 </form>
               </CardContent>
             </Card>
           ))}
+          {departments.length === 0 ? (
+            <EmptyState
+              title="Keine Abteilungen angelegt"
+              description="Abteilungen helfen bei Auswertungen und Nutzerzuordnung."
+              action={
+                <Button asChild size="sm">
+                  <a href="#new-department">Abteilung anlegen</a>
+                </Button>
+              }
+              className="md:col-span-2"
+            />
+          ) : null}
         </div>
-        <Card>
+        <Card id="new-department">
           <CardHeader>
             <CardTitle>Abteilung anlegen</CardTitle>
           </CardHeader>
           <CardContent>
             <form action={createDepartment} className="grid gap-4">
-              <Field name="name" label="Name" />
-              <Field name="managerName" label="Manager" />
+              <Field name="name" label="Name" idSuffix="new" />
+              <Field name="managerName" label="Manager" idSuffix="new" />
               <div className="grid gap-2">
                 <Label htmlFor="description">Beschreibung</Label>
                 <Textarea id="description" name="description" />
@@ -88,16 +108,19 @@ function Stat({ label, value }: { label: string; value: number }) {
 function Field({
   name,
   label,
-  defaultValue
+  defaultValue,
+  idSuffix
 }: {
   name: string;
   label: string;
   defaultValue?: string;
+  idSuffix: string;
 }) {
+  const id = `${name}-${idSuffix}`;
   return (
     <div className="grid gap-2">
-      <Label htmlFor={name}>{label}</Label>
-      <Input id={name} name={name} defaultValue={defaultValue} />
+      <Label htmlFor={id}>{label}</Label>
+      <Input id={id} name={name} defaultValue={defaultValue} />
     </div>
   );
 }

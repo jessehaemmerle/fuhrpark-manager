@@ -7,10 +7,14 @@ import {
   TrendingUp,
   Wrench
 } from "lucide-react";
+import Link from "next/link";
 import { DashboardChart } from "@/components/app/dashboard-chart";
+import { EmptyState } from "@/components/app/empty-state";
 import { MetricCard } from "@/components/app/metric-card";
+import { PageHeader } from "@/components/app/page-header";
 import { UsageBars } from "@/components/app/usage-bars";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDashboardData } from "@/lib/dashboard";
 import { bookingStatusLabels, maintenanceStatusLabels, statusTone } from "@/lib/labels";
@@ -26,36 +30,43 @@ export default async function DashboardPage() {
   const data = await getDashboardData(user.companyId);
   const chartData = [
     { name: "Fahrzeuge", value: data.metrics.totalVehicles },
-    { name: "Verfuegbar", value: data.metrics.availableVehicles },
+    { name: "Verfügbar", value: data.metrics.availableVehicles },
     { name: "Buchungen", value: data.metrics.pendingBookings + data.metrics.approvedBookingsThisMonth },
     { name: "Fahrten", value: data.metrics.activeTrips },
-    { name: "Schaeden", value: data.metrics.openDamageReports }
+    { name: "Schäden", value: data.metrics.openDamageReports }
   ];
 
   return (
     <div className="grid gap-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div>
-          <p className="text-sm font-semibold uppercase text-primary">Dashboard</p>
-          <h1 className="mt-2 text-3xl font-semibold">Guten Tag, {user.name}</h1>
-          <p className="mt-2 text-muted-foreground">
+      <PageHeader
+        eyebrow="Dashboard"
+        title={`Guten Tag, ${user.name}`}
+        description={
+          <>
             Trial bis {formatDate(data.company.trialEndDate)} · Plan {data.plan.name}
-          </p>
-        </div>
-        <Badge tone={data.company.subscriptionTier === "TRIAL" ? "warning" : "success"}>
-          {data.company.subscriptionTier === "TRIAL" ? "Trial aktiv" : "Abo aktiv"}
-        </Badge>
-      </div>
+          </>
+        }
+        actions={
+          <>
+            <Button asChild variant="outline">
+              <Link href="/bookings">Buchung anfragen</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/trip-log">Fahrt starten</Link>
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Fahrzeuge" value={data.metrics.totalVehicles} icon={Car} />
-        <MetricCard label="Verfuegbar" value={data.metrics.availableVehicles} icon={CalendarCheck} />
+        <MetricCard label="Verfügbar" value={data.metrics.availableVehicles} icon={CalendarCheck} />
         <MetricCard label="Aktive Fahrten" value={data.metrics.activeTrips} icon={Gauge} />
-        <MetricCard label="Offene Schaeden" value={data.metrics.openDamageReports} icon={AlertTriangle} />
-        <MetricCard label="Pending Buchungen" value={data.metrics.pendingBookings} icon={TrendingUp} />
-        <MetricCard label="Wartung naechste 30 Tage" value={data.metrics.upcomingMaintenanceCount} icon={Wrench} />
+        <MetricCard label="Offene Schäden" value={data.metrics.openDamageReports} icon={AlertTriangle} />
+        <MetricCard label="Offene Buchungen" value={data.metrics.pendingBookings} icon={TrendingUp} />
+        <MetricCard label="Wartung nächste 30 Tage" value={data.metrics.upcomingMaintenanceCount} icon={Wrench} />
         <MetricCard label="Wartungskosten Monat" value={formatCurrency(data.metrics.maintenanceCostsThisMonth)} icon={Wrench} />
-        <MetricCard label="Fahrerlaubnis laeuft ab" value={data.metrics.expiringDrivers} icon={ShieldAlert} />
+        <MetricCard label="Fahrerlaubnis läuft ab" value={data.metrics.expiringDrivers} icon={ShieldAlert} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -93,6 +104,17 @@ export default async function DashboardPage() {
                 <p className="mt-1 text-muted-foreground">{formatDateTime(booking.startAt)}</p>
               </div>
             ))}
+            {data.recentBookings.length === 0 ? (
+              <EmptyState
+                title="Keine aktuellen Buchungen"
+                description="Sobald eine Buchung erstellt oder genehmigt wird, erscheint sie hier."
+                action={
+                  <Button asChild size="sm">
+                    <Link href="/bookings">Buchung anfragen</Link>
+                  </Button>
+                }
+              />
+            ) : null}
           </CardContent>
         </Card>
         <Card>
@@ -110,7 +132,9 @@ export default async function DashboardPage() {
                 <p className="mt-1 text-muted-foreground">{formatDateTime(record.startAt)}</p>
               </div>
             ))}
-            {data.upcomingMaintenance.length === 0 ? <p className="text-sm text-muted-foreground">Keine Termine.</p> : null}
+            {data.upcomingMaintenance.length === 0 ? (
+              <EmptyState title="Keine anstehenden Termine" description="Geplante Wartungen erscheinen automatisch in dieser Übersicht." />
+            ) : null}
           </CardContent>
         </Card>
         <Card>
@@ -121,11 +145,11 @@ export default async function DashboardPage() {
             {data.expiringDrivers.map((driver) => (
               <div key={driver.id} className="rounded-md border p-3 text-sm">
                 <p className="font-medium">{driver.name}</p>
-                <p className="mt-1 text-muted-foreground">Gueltig bis {formatDate(driver.licenseValidUntil)}</p>
+                <p className="mt-1 text-muted-foreground">Gültig bis {formatDate(driver.licenseValidUntil)}</p>
               </div>
             ))}
             {data.expiringDrivers.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Keine bald ablaufenden Fahrerlaubnisse.</p>
+              <EmptyState title="Keine bald ablaufenden Fahrerlaubnisse" description="Fahrerfreigaben mit Ablaufdatum werden hier frühzeitig sichtbar." />
             ) : null}
           </CardContent>
         </Card>

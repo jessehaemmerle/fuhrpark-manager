@@ -18,7 +18,7 @@ export const licenseStatusLabels: Record<string, string> = {
 };
 
 export const vehicleStatusLabels: Record<string, string> = {
-  AVAILABLE: "Verfuegbar",
+  AVAILABLE: "Verfügbar",
   IN_USE: "In Nutzung",
   DOWNTIME: "Ausfall",
   MAINTENANCE: "Wartung",
@@ -69,7 +69,7 @@ export const maintenanceTypeLabels: Record<string, string> = {
 };
 
 export const tripTypeLabels: Record<string, string> = {
-  BUSINESS: "Geschaeftlich",
+  BUSINESS: "Geschäftlich",
   PRIVATE: "Privat",
   COMMUTE: "Arbeitsweg",
   OTHER: "Sonstige"
@@ -84,15 +84,15 @@ export const damageSeverityLabels: Record<string, string> = {
 
 export const damageStatusLabels: Record<string, string> = {
   OPEN: "Offen",
-  IN_REVIEW: "In Pruefung",
+  IN_REVIEW: "In Prüfung",
   SCHEDULED_FOR_REPAIR: "Reparatur geplant",
   RESOLVED: "Erledigt",
   REJECTED: "Abgelehnt"
 };
 
 export const handoverTypeLabels: Record<string, string> = {
-  HANDOVER: "Uebergabe",
-  RETURN: "Rueckgabe"
+  HANDOVER: "Übergabe",
+  RETURN: "Rückgabe"
 };
 
 export function statusTone(status: string) {

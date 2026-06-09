@@ -1,6 +1,9 @@
+import * as React from "react";
 import Link from "next/link";
 import { FuelType, VehicleCategory, VehicleStatus } from "@prisma/client";
 import { Archive, Download, QrCode, RotateCw } from "lucide-react";
+import { EmptyState } from "@/components/app/empty-state";
+import { PageHeader } from "@/components/app/page-header";
 import { archiveVehicle, disableVehicleQr, regenerateVehicleQr, updateVehicle } from "@/server/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,24 +48,25 @@ export default async function VehicleDetailPage({ params }: { params: { id: stri
 
   const maintenanceCost = vehicle.maintenanceRecords.reduce((sum, record) => sum + Number(record.cost), 0);
   const qrUrl = vehicle.qrCodeToken ? `${getAppUrl()}/v/${vehicle.qrCodeToken}` : null;
+  const qrActive = vehicle.qrCodeEnabled && Boolean(vehicle.qrCodeToken);
 
   return (
     <div className="grid gap-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div>
-          <p className="text-sm font-semibold uppercase text-primary">Fahrzeug</p>
-          <h1 className="mt-2 text-3xl font-semibold">
-            {vehicle.brand} {vehicle.model}
-          </h1>
-          <p className="mt-2 text-muted-foreground">
+      <PageHeader
+        eyebrow="Fahrzeug"
+        title={`${vehicle.brand} ${vehicle.model}`}
+        description={
+          <>
             {vehicle.licensePlate} · {vehicle.internalNumber} · {vehicle.mileage.toLocaleString("de-DE")} km
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
+          </>
+        }
+        actions={
+          <>
           <Badge tone={statusTone(vehicle.status)}>{vehicleStatusLabels[vehicle.status]}</Badge>
           <Badge>{vehicleCategoryLabels[vehicle.category]}</Badge>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <div className="grid gap-6">
@@ -72,7 +76,7 @@ export default async function VehicleDetailPage({ params }: { params: { id: stri
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-[220px_1fr]">
               <div className="flex aspect-square items-center justify-center rounded-md border bg-white">
-                {vehicle.qrCodeEnabled && vehicle.qrCodeToken ? (
+                {qrActive ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={`/api/vehicles/${vehicle.id}/qr?format=svg`} alt="Fahrzeug QR-Code" className="h-44 w-44" />
                 ) : (
@@ -83,10 +87,10 @@ export default async function VehicleDetailPage({ params }: { params: { id: stri
                 <p className="font-medium">Sicherer Fahrzeuglink</p>
                 <p className="break-all text-muted-foreground">{qrUrl ?? "QR-Code deaktiviert oder Token fehlt."}</p>
                 <div className="flex flex-wrap gap-2">
-                  {vehicle.qrCodeEnabled && vehicle.qrCodeToken ? (
+                  {qrActive ? (
                     <>
                       <Button asChild variant="outline" size="sm">
-                        <Link href={`/v/${vehicle.qrCodeToken}`}>Workflow oeffnen</Link>
+                        <Link href={`/v/${vehicle.qrCodeToken}`}>Workflow öffnen</Link>
                       </Button>
                       <Button asChild variant="outline" size="sm">
                         <Link href={`/api/vehicles/${vehicle.id}/qr?format=svg`}>
@@ -103,16 +107,18 @@ export default async function VehicleDetailPage({ params }: { params: { id: stri
                   <form action={regenerateVehicleQr}>
                     <input type="hidden" name="vehicleId" value={vehicle.id} />
                     <Button size="sm" variant="outline">
-                      <RotateCw className="h-4 w-4" /> Token erneuern
+                      <RotateCw className="h-4 w-4" /> {qrActive ? "Token erneuern" : "QR-Code erstellen"}
                     </Button>
                   </form>
-                  <form action={disableVehicleQr}>
-                    <input type="hidden" name="vehicleId" value={vehicle.id} />
-                    <Button size="sm" variant="destructive">QR deaktivieren</Button>
-                  </form>
+                  {qrActive ? (
+                    <form action={disableVehicleQr}>
+                      <input type="hidden" name="vehicleId" value={vehicle.id} />
+                      <Button size="sm" variant="destructive">QR deaktivieren</Button>
+                    </form>
+                  ) : null}
                 </div>
                 <p className="text-muted-foreground">
-                  Der QR-Code enthaelt nur einen zufaelligen Token. Mandant und Berechtigung werden serverseitig geprueft.
+                  Der QR-Code enthält nur einen zufälligen Token. Mandant und Berechtigung werden serverseitig geprüft.
                 </p>
               </div>
             </CardContent>
@@ -125,11 +131,11 @@ export default async function VehicleDetailPage({ params }: { params: { id: stri
             <CardContent className="grid gap-4 md:grid-cols-3">
               <Summary label="Wartungskosten" value={formatCurrency(maintenanceCost)} />
               <Summary label="Fahrten" value={vehicle.tripLogs.length} />
-              <Summary label="Schaeden" value={vehicle.damageReports.length} />
+              <Summary label="Schäden" value={vehicle.damageReports.length} />
             </CardContent>
           </Card>
 
-          <HistorySection title="Buchungen">
+          <HistorySection title="Buchungen" emptyText="Keine Buchungen für dieses Fahrzeug.">
             {vehicle.bookings.map((booking) => (
               <HistoryRow key={booking.id} title={booking.purpose} meta={`${booking.user.name} · ${formatDateTime(booking.startAt)}`}>
                 <Badge tone={statusTone(booking.status)}>{bookingStatusLabels[booking.status]}</Badge>
@@ -137,7 +143,7 @@ export default async function VehicleDetailPage({ params }: { params: { id: stri
             ))}
           </HistorySection>
 
-          <HistorySection title="Fahrtenbuch">
+          <HistorySection title="Fahrtenbuch" emptyText="Noch keine Fahrten erfasst.">
             {vehicle.tripLogs.map((trip) => (
               <HistoryRow key={trip.id} title={trip.purpose} meta={`${trip.user.name} · ${formatDateTime(trip.startAt)} · ${trip.distance ?? 0} km`}>
                 <Badge>{tripTypeLabels[trip.tripType]}</Badge>
@@ -145,7 +151,7 @@ export default async function VehicleDetailPage({ params }: { params: { id: stri
             ))}
           </HistorySection>
 
-          <HistorySection title="Wartung">
+          <HistorySection title="Wartung" emptyText="Keine Wartungen hinterlegt.">
             {vehicle.maintenanceRecords.map((record) => (
               <HistoryRow key={record.id} title={record.title} meta={`${maintenanceTypeLabels[record.type]} · ${formatDateTime(record.startAt)} · ${formatCurrency(Number(record.cost))}`}>
                 <Badge tone={statusTone(record.status)}>{maintenanceStatusLabels[record.status]}</Badge>
@@ -153,7 +159,7 @@ export default async function VehicleDetailPage({ params }: { params: { id: stri
             ))}
           </HistorySection>
 
-          <HistorySection title="Schaeden">
+          <HistorySection title="Schäden" emptyText="Keine Schäden gemeldet.">
             {vehicle.damageReports.map((damage) => (
               <HistoryRow key={damage.id} title={damage.title} meta={`${damage.reporter.name} · ${damageSeverityLabels[damage.severity]}`}>
                 <Badge tone={statusTone(damage.status)}>{damageStatusLabels[damage.status]}</Badge>
@@ -161,7 +167,7 @@ export default async function VehicleDetailPage({ params }: { params: { id: stri
             ))}
           </HistorySection>
 
-          <HistorySection title="Uebergaben und Rueckgaben">
+          <HistorySection title="Übergaben und Rückgaben" emptyText="Noch keine Übergaben oder Rückgaben erfasst.">
             {vehicle.handovers.map((handover) => (
               <HistoryRow key={handover.id} title={handoverTypeLabels[handover.type]} meta={`${handover.user.name} · ${formatDateTime(handover.handledAt)} · ${handover.mileage} km`}>
                 <Badge>{handover.newDamageReported ? "Neuer Schaden" : "Ohne neuen Schaden"}</Badge>
@@ -208,13 +214,15 @@ function Summary({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function HistorySection({ title, children }: { title: string; children: React.ReactNode }) {
+function HistorySection({ title, emptyText, children }: { title: string; emptyText: string; children: React.ReactNode }) {
+  const hasItems = React.Children.count(children) > 0;
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-3">{children}</CardContent>
+      <CardContent className="grid gap-3">{hasItems ? children : <EmptyState title={emptyText} />}</CardContent>
     </Card>
   );
 }
@@ -257,11 +265,11 @@ function EditVehicleForm({
     <form action={action} className="grid gap-4">
       <Field name="internalNumber" label="Interne Nummer" defaultValue={vehicle.internalNumber} />
       <Field name="licensePlate" label="Kennzeichen" defaultValue={vehicle.licensePlate} />
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field name="brand" label="Marke" defaultValue={vehicle.brand} />
         <Field name="model" label="Modell" defaultValue={vehicle.model} />
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field name="year" label="Baujahr" type="number" defaultValue={vehicle.year ?? ""} />
         <Field name="mileage" label="Kilometer" type="number" defaultValue={vehicle.mileage} />
       </div>
@@ -307,7 +315,7 @@ function EditVehicleForm({
         <input type="checkbox" name="qrCodeEnabled" defaultChecked={vehicle.qrCodeEnabled} />
         QR-Code aktiviert
       </label>
-      <Button>Speichern</Button>
+      <Button>Fahrzeug speichern</Button>
     </form>
   );
 }

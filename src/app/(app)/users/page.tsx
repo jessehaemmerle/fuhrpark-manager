@@ -1,4 +1,5 @@
 import { UserRole } from "@prisma/client";
+import { PageHeader } from "@/components/app/page-header";
 import { createUser, deactivateUser, updateDriverPermissions, updateUser } from "@/server/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,10 +34,16 @@ export default async function UsersPage() {
 
   return (
     <div className="grid gap-6">
-      <div>
-        <p className="text-sm font-semibold uppercase text-primary">User Management</p>
-        <h1 className="mt-2 text-3xl font-semibold">Nutzer & Fahrerfreigaben</h1>
-      </div>
+      <PageHeader
+        eyebrow="Nutzerverwaltung"
+        title="Nutzer & Fahrerfreigaben"
+        description="Rollen, Abteilungen und Führerscheindaten an einem Ort pflegen."
+        actions={
+          <Button asChild>
+            <a href="#new-user">Nutzer anlegen</a>
+          </Button>
+        }
+      />
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <div className="grid gap-4">
           {users.map((user) => (
@@ -62,8 +69,8 @@ export default async function UsersPage() {
                   <input type="hidden" name="licenseValidUntil" value={user.licenseValidUntil?.toISOString().slice(0, 10) ?? ""} />
                   <input type="hidden" name="driverNotes" value={user.driverNotes ?? ""} />
                   <input type="hidden" name="active" value={String(user.active)} />
-                  <Field name="name" label="Name" defaultValue={user.name} />
-                  <Field name="email" label="E-Mail" type="email" defaultValue={user.email} />
+                  <Field name="name" label="Name" defaultValue={user.name} idSuffix={user.id} />
+                  <Field name="email" label="E-Mail" type="email" defaultValue={user.email} idSuffix={user.id} />
                   <div className="grid gap-2">
                     <Label htmlFor={`role-${user.id}`}>Rolle</Label>
                     <SelectField id={`role-${user.id}`} name="role" defaultValue={user.role}>
@@ -76,7 +83,7 @@ export default async function UsersPage() {
                         ))}
                     </SelectField>
                   </div>
-                  <DepartmentSelect value={user.departmentId ?? ""} departments={departments} />
+                  <DepartmentSelect value={user.departmentId ?? ""} departments={departments} idSuffix={user.id} />
                   <Button size="sm">Profil speichern</Button>
                 </form>
                 <div className="grid gap-3">
@@ -92,10 +99,10 @@ export default async function UsersPage() {
                         Gesperrt
                       </label>
                     </div>
-                    <Field name="licenseClass" label="Klasse" defaultValue={user.licenseClass ?? ""} />
-                    <Field name="licenseNumber" label="Fuehrerscheinnummer" defaultValue={user.licenseNumber ?? ""} />
-                    <Field name="licenseValidUntil" label="Gueltig bis" type="date" defaultValue={user.licenseValidUntil?.toISOString().slice(0, 10) ?? ""} />
-                    <Field name="lastLicenseCheckDate" label="Letzte Pruefung" type="date" defaultValue={user.lastLicenseCheckDate?.toISOString().slice(0, 10) ?? ""} />
+                    <Field name="licenseClass" label="Klasse" defaultValue={user.licenseClass ?? ""} idSuffix={`license-${user.id}`} />
+                    <Field name="licenseNumber" label="Führerscheinnummer" defaultValue={user.licenseNumber ?? ""} idSuffix={`license-${user.id}`} />
+                    <Field name="licenseValidUntil" label="Gültig bis" type="date" defaultValue={user.licenseValidUntil?.toISOString().slice(0, 10) ?? ""} idSuffix={`license-${user.id}`} />
+                    <Field name="lastLicenseCheckDate" label="Letzte Prüfung" type="date" defaultValue={user.lastLicenseCheckDate?.toISOString().slice(0, 10) ?? ""} idSuffix={`license-${user.id}`} />
                     <div className="grid gap-2">
                       <Label htmlFor={`notes-${user.id}`}>Notizen</Label>
                       <Textarea id={`notes-${user.id}`} name="driverNotes" defaultValue={user.driverNotes ?? ""} />
@@ -108,22 +115,22 @@ export default async function UsersPage() {
                       <Button size="sm" variant="destructive">Deaktivieren</Button>
                     </form>
                   ) : null}
-                  <p className="text-xs text-muted-foreground">Gueltig bis: {formatDate(user.licenseValidUntil)}</p>
+                  <p className="text-xs text-muted-foreground">Gültig bis: {formatDate(user.licenseValidUntil)}</p>
                 </div>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        <Card>
+        <Card id="new-user">
           <CardHeader>
             <CardTitle>Nutzer anlegen</CardTitle>
           </CardHeader>
           <CardContent>
             <form action={createUser} className="grid gap-4">
-              <Field name="name" label="Name" />
-              <Field name="email" label="E-Mail" type="email" />
-              <Field name="password" label="Initialpasswort" type="password" />
+              <Field name="name" label="Name" idSuffix="new" />
+              <Field name="email" label="E-Mail" type="email" idSuffix="new" />
+              <Field name="password" label="Initialpasswort" type="password" idSuffix="new" />
               <div className="grid gap-2">
                 <Label htmlFor="role">Rolle</Label>
                 <SelectField id="role" name="role" defaultValue={UserRole.USER}>
@@ -136,7 +143,7 @@ export default async function UsersPage() {
                     ))}
                 </SelectField>
               </div>
-              <DepartmentSelect value="" departments={departments} />
+              <DepartmentSelect value="" departments={departments} idSuffix="new" />
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <label className="flex items-center gap-2">
                   <input type="checkbox" name="driverApproved" />
@@ -147,9 +154,9 @@ export default async function UsersPage() {
                   Fahrer sperren
                 </label>
               </div>
-              <Field name="licenseClass" label="Klasse" />
-              <Field name="licenseNumber" label="Fuehrerscheinnummer" />
-              <Field name="licenseValidUntil" label="Gueltig bis" type="date" />
+              <Field name="licenseClass" label="Klasse" idSuffix="new" />
+              <Field name="licenseNumber" label="Führerscheinnummer" idSuffix="new" />
+              <Field name="licenseValidUntil" label="Gültig bis" type="date" idSuffix="new" />
               <div className="grid gap-2">
                 <Label htmlFor="driverNotes">Notizen</Label>
                 <Textarea id="driverNotes" name="driverNotes" />
@@ -165,15 +172,18 @@ export default async function UsersPage() {
 
 function DepartmentSelect({
   value,
-  departments
+  departments,
+  idSuffix
 }: {
   value: string;
   departments: Array<{ id: string; name: string }>;
+  idSuffix: string;
 }) {
+  const id = `departmentId-${idSuffix}`;
   return (
     <div className="grid gap-2">
-      <Label htmlFor="departmentId">Abteilung</Label>
-      <SelectField id="departmentId" name="departmentId" defaultValue={value}>
+      <Label htmlFor={id}>Abteilung</Label>
+      <SelectField id={id} name="departmentId" defaultValue={value}>
         <option value="">Keine Abteilung</option>
         {departments.map((department) => (
           <option key={department.id} value={department.id}>
@@ -189,17 +199,20 @@ function Field({
   name,
   label,
   type = "text",
-  defaultValue
+  defaultValue,
+  idSuffix
 }: {
   name: string;
   label: string;
   type?: string;
   defaultValue?: string;
+  idSuffix: string;
 }) {
+  const id = `${name}-${idSuffix}`;
   return (
     <div className="grid gap-2">
-      <Label htmlFor={name}>{label}</Label>
-      <Input id={name} name={name} type={type} defaultValue={defaultValue} />
+      <Label htmlFor={id}>{label}</Label>
+      <Input id={id} name={name} type={type} defaultValue={defaultValue} />
     </div>
   );
 }

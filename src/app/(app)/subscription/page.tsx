@@ -1,4 +1,5 @@
 import { PricingCards } from "@/components/marketing/pricing-cards";
+import { PageHeader } from "@/components/app/page-header";
 import { UsageBars } from "@/components/app/usage-bars";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,11 +21,11 @@ export default async function SubscriptionPage() {
 
   return (
     <div className="grid gap-6">
-      <div>
-        <p className="text-sm font-semibold uppercase text-primary">Subscription</p>
-        <h1 className="mt-2 text-3xl font-semibold">Abo & Nutzung</h1>
-        <p className="mt-2 text-muted-foreground">Trial endet am {formatDate(company.trialEndDate)}.</p>
-      </div>
+      <PageHeader
+        eyebrow="Abonnement"
+        title="Abo & Nutzung"
+        description={`Trial endet am ${formatDate(company.trialEndDate)}.`}
+      />
 
       <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
         <Card>
@@ -40,11 +41,11 @@ export default async function SubscriptionPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Stripe-ready Struktur</CardTitle>
+            <CardTitle>Kontakt & Abrechnung</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm text-muted-foreground">
-            <p>Planlimits, Feature Flags und Usage Snapshots sind vom Zahlungsanbieter getrennt.</p>
-            <p>Stripe kann spaeter ueber Checkout, Customer Portal, Webhooks und Subscription Sync angebunden werden.</p>
+            <p>Planwechsel, Lizenzlaufzeit und Vertragsfragen werden zentral betreut.</p>
+            <p>Für Änderungen am Abo kontaktieren Sie den Vertrieb.</p>
             <Button asChild variant="outline" className="w-fit">
               <a href="/contact">Vertrieb kontaktieren</a>
             </Button>
