@@ -15,7 +15,8 @@ const protectedPrefixes = [
   "/reports",
   "/subscription",
   "/settings",
-  "/admin"
+  "/admin",
+  "/set-password"
 ];
 
 export function middleware(request: NextRequest) {
@@ -51,6 +52,7 @@ export const config = {
     "/subscription/:path*",
     "/settings/:path*",
     "/admin/:path*",
+    "/set-password",
     "/login",
     "/register"
   ]

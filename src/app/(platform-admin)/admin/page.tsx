@@ -1,3 +1,4 @@
+import { randomBytes } from "crypto";
 import { LicenseStatus, SubscriptionTier, UserRole } from "@prisma/client";
 import {
   archivePlatformLicense,
@@ -8,7 +9,7 @@ import {
 } from "@/server/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
@@ -37,6 +38,10 @@ function futureDateInput(days: number) {
 
 function limitValue(value: number | null | undefined) {
   return value?.toString() ?? "";
+}
+
+function temporaryPassword() {
+  return `Fb7-${randomBytes(10).toString("base64url")}`;
 }
 
 export default async function PlatformAdminPage() {
@@ -70,6 +75,7 @@ export default async function PlatformAdminPage() {
   const activeLicenses = licenses.filter((license) => license.status === "ACTIVE").length;
   const archivedLicenses = licenses.filter((license) => license.status === "ARCHIVED").length;
   const accessRows = users.sort((a, b) => a.company.name.localeCompare(b.company.name) || a.name.localeCompare(b.name));
+  const tenantRoles = Object.values(UserRole).filter((role) => role !== UserRole.PLATFORM_ADMIN);
 
   return (
     <div className="grid gap-6">
@@ -92,6 +98,7 @@ export default async function PlatformAdminPage() {
       <Card>
         <CardHeader>
           <CardTitle>Neue Lizenz generieren</CardTitle>
+          <CardDescription>Optional kann direkt ein Erstzugang mit Einmalpasswort angelegt werden.</CardDescription>
         </CardHeader>
         <CardContent>
           <form action={createPlatformLicense} className="grid gap-4 lg:grid-cols-4">
@@ -120,6 +127,49 @@ export default async function PlatformAdminPage() {
             <Field name="validUntil" label="Gueltig bis" type="date" defaultValue={futureDateInput(365)} />
             <Field name="maxUsers" label="Nutzerlimit" type="number" />
             <Field name="maxVehicles" label="Fahrzeuglimit" type="number" />
+            <div className="grid gap-4 rounded-md border bg-muted/20 p-4 lg:col-span-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium">Erstzugang</p>
+                  <p className="text-sm text-muted-foreground">
+                    Der Nutzer meldet sich mit dem Einmalpasswort an und vergibt danach ein eigenes Passwort.
+                  </p>
+                </div>
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input type="checkbox" name="createInitialUser" />
+                  Nutzer anlegen
+                </label>
+              </div>
+              <div className="grid gap-4 lg:grid-cols-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="initialUserName">Name</Label>
+                  <Input id="initialUserName" name="initialUserName" autoComplete="name" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="initialUserEmail">E-Mail</Label>
+                  <Input id="initialUserEmail" name="initialUserEmail" type="email" autoComplete="email" />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="initialUserRole">Rolle</Label>
+                  <SelectField id="initialUserRole" name="initialUserRole" defaultValue={UserRole.OWNER}>
+                    {tenantRoles.map((role) => (
+                      <option key={role} value={role}>
+                        {roleLabels[role]}
+                      </option>
+                    ))}
+                  </SelectField>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="initialUserTemporaryPassword">Einmalpasswort</Label>
+                  <Input
+                    id="initialUserTemporaryPassword"
+                    name="initialUserTemporaryPassword"
+                    defaultValue={temporaryPassword()}
+                    autoComplete="new-password"
+                  />
+                </div>
+              </div>
+            </div>
             <div className="grid gap-2 lg:col-span-3">
               <Label htmlFor="notes">Notizen</Label>
               <Textarea id="notes" name="notes" />
@@ -274,8 +324,8 @@ export default async function PlatformAdminPage() {
                   Aktiv
                 </label>
                 <div className="grid gap-2">
-                  <Label htmlFor={`password-${user.id}`}>Neues Passwort</Label>
-                  <Input id={`password-${user.id}`} name="password" type="password" autoComplete="new-password" />
+                  <Label htmlFor={`password-${user.id}`}>Einmalpasswort</Label>
+                  <Input id={`password-${user.id}`} name="password" autoComplete="new-password" />
                 </div>
                 <Button size="sm">Zugang speichern</Button>
               </div>
@@ -283,6 +333,8 @@ export default async function PlatformAdminPage() {
                 <Badge>{roleLabels[user.role]}</Badge>
                 <Badge tone={user.active ? "success" : "danger"}>{user.active ? "Aktiv" : "Inaktiv"}</Badge>
                 <Badge tone={user.company.active ? "success" : "danger"}>{user.company.active ? "Mandant aktiv" : "Mandant gesperrt"}</Badge>
+                {user.mustChangePassword ? <Badge tone="warning">Passwortwechsel offen</Badge> : null}
+                {user.temporaryPasswordIssuedAt ? <Badge tone="warning">Einmalpasswort aktiv</Badge> : null}
               </div>
             </form>
           ))}

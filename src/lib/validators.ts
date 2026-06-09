@@ -14,6 +14,7 @@ import {
   VehicleStatus
 } from "@prisma/client";
 import { z } from "zod";
+import { passwordSchema } from "@/lib/auth-validators";
 export { loginSchema, registerSchema } from "@/lib/auth-validators";
 
 const requiredText = (label: string, min = 2) =>
@@ -157,7 +158,7 @@ export const departmentSchema = z.object({
 export const userCreateSchema = z.object({
   name: requiredText("Name"),
   email: z.string().trim().email().toLowerCase(),
-  password: z.string().min(10),
+  password: passwordSchema,
   role: z.nativeEnum(UserRole),
   departmentId: z.preprocess((value) => (value === "" ? undefined : value), idSchema.optional()),
   driverApproved: checkbox.default(false),
@@ -172,7 +173,7 @@ export const userUpdateSchema = userCreateSchema
   .omit({ password: true })
   .extend({
     userId: idSchema,
-    password: z.preprocess((value) => (value === "" ? undefined : value), z.string().min(10).optional()),
+    password: z.preprocess((value) => (value === "" ? undefined : value), passwordSchema.optional()),
     active: checkbox.default(true)
   });
 
@@ -202,7 +203,7 @@ export const platformUserAccessSchema = z.object({
   userId: idSchema,
   role: z.nativeEnum(UserRole),
   active: checkbox.default(false),
-  password: z.preprocess((value) => (value === "" ? undefined : value), z.string().min(10).optional())
+  password: z.preprocess((value) => (value === "" ? undefined : value), passwordSchema.optional())
 });
 
 const optionalPositiveInt = z.preprocess(
@@ -218,16 +219,55 @@ const platformLicenseBaseShape = {
   validUntil: z.coerce.date(),
   maxUsers: optionalPositiveInt,
   maxVehicles: optionalPositiveInt,
-  notes: optionalText
+  notes: optionalText,
+  createInitialUser: checkbox.default(false),
+  initialUserName: optionalShortText,
+  initialUserEmail: optionalShortText,
+  initialUserRole: z.nativeEnum(UserRole).default(UserRole.OWNER),
+  initialUserTemporaryPassword: optionalShortText
 };
 
 const validLicenseDateRange = <T extends { validFrom: Date; validUntil: Date }>(data: T) => data.validUntil >= data.validFrom;
+const validTenantInitialRole = <T extends { createInitialUser: boolean; initialUserRole: UserRole }>(data: T) =>
+  !data.createInitialUser || data.initialUserRole !== UserRole.PLATFORM_ADMIN;
+const validInitialUserFields = <
+  T extends {
+    createInitialUser: boolean;
+    initialUserName?: string;
+    initialUserEmail?: string;
+    initialUserTemporaryPassword?: string;
+  }
+>(
+  data: T
+) => !data.createInitialUser || Boolean(data.initialUserName && data.initialUserEmail && data.initialUserTemporaryPassword);
+const validInitialUserEmail = <T extends { createInitialUser: boolean; initialUserEmail?: string }>(data: T) =>
+  !data.createInitialUser || !data.initialUserEmail || z.string().email().safeParse(data.initialUserEmail).success;
+const validInitialUserPassword = <T extends { createInitialUser: boolean; initialUserTemporaryPassword?: string }>(data: T) =>
+  !data.createInitialUser || !data.initialUserTemporaryPassword || passwordSchema.safeParse(data.initialUserTemporaryPassword).success;
 const licenseDateRangeMessage = {
   message: "Die Lizenz darf nicht vor dem Startdatum enden.",
   path: ["validUntil"]
 };
 
-export const platformLicenseCreateSchema = z.object(platformLicenseBaseShape).refine(validLicenseDateRange, licenseDateRangeMessage);
+export const platformLicenseCreateSchema = z
+  .object(platformLicenseBaseShape)
+  .refine(validLicenseDateRange, licenseDateRangeMessage)
+  .refine(validTenantInitialRole, {
+    message: "Initiale Mandantennutzer duerfen keine Plattform-Admin-Rolle erhalten.",
+    path: ["initialUserRole"]
+  })
+  .refine(validInitialUserFields, {
+    message: "Name, E-Mail und Einmalpasswort sind fuer den initialen Nutzer erforderlich.",
+    path: ["initialUserEmail"]
+  })
+  .refine(validInitialUserEmail, {
+    message: "Bitte gueltige E-Mail eingeben.",
+    path: ["initialUserEmail"]
+  })
+  .refine(validInitialUserPassword, {
+    message: "Das Einmalpasswort muss mindestens 10 Zeichen haben und Grossbuchstaben, Kleinbuchstaben sowie eine Zahl enthalten.",
+    path: ["initialUserTemporaryPassword"]
+  });
 
 export const platformLicenseUpdateSchema = z
   .object({

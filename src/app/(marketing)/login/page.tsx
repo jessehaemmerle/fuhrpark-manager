@@ -16,6 +16,11 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <LoginForm />
+          <p className="mt-4 text-sm text-muted-foreground">
+            <Link href="/forgot-password" className="font-semibold text-primary">
+              Passwort vergessen?
+            </Link>
+          </p>
           <p className="mt-5 text-sm text-muted-foreground">
             Noch kein Konto?{" "}
             <Link href="/register" className="font-semibold text-primary">

@@ -823,6 +823,7 @@ export async function createUser(formData: FormData) {
       licenseNumber: data.licenseNumber,
       licenseValidUntil: data.licenseValidUntil,
       driverNotes: data.driverNotes,
+      passwordChangedAt: new Date(),
       lastLicenseCheckDate: new Date()
     }
   });
@@ -870,7 +871,13 @@ export async function updateUser(formData: FormData) {
       licenseNumber: data.licenseNumber,
       licenseValidUntil: data.licenseValidUntil,
       driverNotes: data.driverNotes,
-      passwordHash: data.password ? await hashPassword(data.password) : undefined
+      passwordHash: data.password ? await hashPassword(data.password) : undefined,
+      passwordChangedAt: data.password ? new Date() : undefined,
+      mustChangePassword: data.password ? false : undefined,
+      temporaryPasswordIssuedAt: data.password ? null : undefined,
+      passwordResetTokenHash: data.password ? null : undefined,
+      passwordResetTokenExpiresAt: data.password ? null : undefined,
+      passwordResetRequestedAt: data.password ? null : undefined
     }
   });
 
@@ -979,19 +986,43 @@ export async function createPlatformLicense(formData: FormData) {
   const actor = await requireRole(["PLATFORM_ADMIN"]);
   const data = parseForm(platformLicenseCreateSchema, formData);
   const company = await prisma.company.findUniqueOrThrow({ where: { id: data.companyId } });
-  const license = await prisma.license.create({
-    data: {
-      companyId: company.id,
-      licenseKey: await uniqueLicenseKey(),
-      name: data.name,
-      tier: data.tier,
-      validFrom: data.validFrom,
-      validUntil: data.validUntil,
-      maxUsers: data.maxUsers ?? null,
-      maxVehicles: data.maxVehicles ?? null,
-      notes: data.notes ?? null,
-      createdById: actor.id
-    }
+  const licenseKey = await uniqueLicenseKey();
+  const initialUserPasswordHash =
+    data.createInitialUser && data.initialUserTemporaryPassword ? await hashPassword(data.initialUserTemporaryPassword) : null;
+  const result = await prisma.$transaction(async (tx) => {
+    const license = await tx.license.create({
+      data: {
+        companyId: company.id,
+        licenseKey,
+        name: data.name,
+        tier: data.tier,
+        validFrom: data.validFrom,
+        validUntil: data.validUntil,
+        maxUsers: data.maxUsers ?? null,
+        maxVehicles: data.maxVehicles ?? null,
+        notes: data.notes ?? null,
+        createdById: actor.id
+      }
+    });
+
+    const initialUser =
+      data.createInitialUser && data.initialUserName && data.initialUserEmail && initialUserPasswordHash
+        ? await tx.user.create({
+            data: {
+              companyId: company.id,
+              name: data.initialUserName,
+              email: data.initialUserEmail.toLowerCase(),
+              passwordHash: initialUserPasswordHash,
+              role: data.initialUserRole,
+              active: true,
+              driverApproved: data.initialUserRole === "OWNER" || data.initialUserRole === "FLEET_MANAGER",
+              mustChangePassword: true,
+              temporaryPasswordIssuedAt: new Date()
+            }
+          })
+        : null;
+
+    return { license, initialUser };
   });
 
   await syncCompanyFromLatestActiveLicense(company.id, actor.companyId);
@@ -1000,14 +1031,30 @@ export async function createPlatformLicense(formData: FormData) {
     actorUserId: actor.id,
     action: "platform.license_created",
     entityType: "License",
-    entityId: license.id,
+    entityId: result.license.id,
     metadata: {
-      licenseKey: license.licenseKey,
-      tier: license.tier,
-      validUntil: license.validUntil.toISOString()
+      licenseKey: result.license.licenseKey,
+      tier: result.license.tier,
+      validUntil: result.license.validUntil.toISOString(),
+      initialUserEmail: result.initialUser?.email
     }
   });
+  if (result.initialUser) {
+    await writeAuditLog({
+      companyId: company.id,
+      actorUserId: actor.id,
+      action: "platform.initial_user_created",
+      entityType: "User",
+      entityId: result.initialUser.id,
+      metadata: {
+        email: result.initialUser.email,
+        role: result.initialUser.role,
+        mustChangePassword: true
+      }
+    });
+  }
   revalidatePath("/admin");
+  revalidatePath("/users");
   revalidatePath("/subscription");
   revalidatePath("/dashboard");
 }
@@ -1114,7 +1161,13 @@ export async function updatePlatformUserAccess(formData: FormData) {
     data: {
       role: data.role,
       active: data.active,
-      passwordHash: data.password ? await hashPassword(data.password) : undefined
+      passwordHash: data.password ? await hashPassword(data.password) : undefined,
+      passwordChangedAt: data.password ? null : undefined,
+      mustChangePassword: data.password ? true : undefined,
+      temporaryPasswordIssuedAt: data.password ? new Date() : undefined,
+      passwordResetTokenHash: data.password ? null : undefined,
+      passwordResetTokenExpiresAt: data.password ? null : undefined,
+      passwordResetRequestedAt: data.password ? null : undefined
     }
   });
 
@@ -1129,7 +1182,8 @@ export async function updatePlatformUserAccess(formData: FormData) {
       fromRole: target.role,
       toRole: data.role,
       active: data.active,
-      passwordChanged: Boolean(data.password)
+      passwordChanged: Boolean(data.password),
+      mustChangePassword: Boolean(data.password)
     }
   });
   revalidatePath("/admin");

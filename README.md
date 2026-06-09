@@ -319,7 +319,7 @@ npm run db:studio
 - Legal pages are placeholders and not legal advice
 - In-memory rate limiting is not distributed
 - Report filters apply to chart data, but deeper saved report presets are not implemented
-- No email notifications yet
+- No email notifications yet; password reset links are generated server-side and need an email provider in production
 
 ## Future Stripe Integration Plan
 

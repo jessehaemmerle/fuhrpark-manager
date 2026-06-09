@@ -19,6 +19,7 @@ export type AuthenticatedUser = {
   email: string;
   role: UserRole;
   active: boolean;
+  mustChangePassword: boolean;
   driverApproved: boolean;
   driverBlocked: boolean;
   licenseValidUntil: Date | null;
@@ -124,6 +125,7 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
         email: true,
         role: true,
         active: true,
+        mustChangePassword: true,
         driverApproved: true,
         driverBlocked: true,
         licenseValidUntil: true,
@@ -150,6 +152,13 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
 }
 
 export async function requireAuth() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (user.mustChangePassword) redirect("/set-password");
+  return user;
+}
+
+export async function requireAuthForPasswordChange() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   return user;
