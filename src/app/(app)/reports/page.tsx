@@ -1,4 +1,6 @@
 import { DamageSeverity, TripType } from "@prisma/client";
+import Link from "next/link";
+import { PageHeader } from "@/components/app/page-header";
 import { DepartmentBookingsChart, DamageSeverityChart, VehicleUtilizationChart } from "@/components/app/report-charts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,9 +12,21 @@ import { getReportData } from "@/lib/dashboard";
 import { damageSeverityLabels, tripTypeLabels } from "@/lib/labels";
 import { getPlan } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
+import { formatCurrency } from "@/lib/utils";
 
 export const metadata = {
   title: "Reports"
+};
+
+const exportLabels: Record<string, string> = {
+  vehicles: "Fahrzeuge",
+  bookings: "Buchungen",
+  maintenance: "Wartung",
+  users: "Nutzer",
+  departments: "Abteilungen",
+  "trip-logs": "Fahrtenbuch",
+  "damage-reports": "Schäden",
+  handovers: "Übergaben"
 };
 
 export default async function ReportsPage({
@@ -33,10 +47,7 @@ export default async function ReportsPage({
   if (!plan.analyticsAccess) {
     return (
       <div className="grid gap-6">
-        <div>
-          <p className="text-sm font-semibold uppercase text-primary">Analytics</p>
-          <h1 className="mt-2 text-3xl font-semibold">Reports</h1>
-        </div>
+        <PageHeader eyebrow="Analytics" title="Reports" />
         <Card>
           <CardContent className="grid gap-4 pt-5">
             <p className="font-semibold">Analytics ist in Ihrem aktuellen Plan nicht enthalten.</p>
@@ -54,20 +65,46 @@ export default async function ReportsPage({
   }
 
   const reportData = await getReportData(user.companyId, searchParams);
+  const canExportTenantAdminData = user.role === "OWNER" || user.role === "PLATFORM_ADMIN";
+  const exportTypes = [
+    "vehicles",
+    "bookings",
+    "maintenance",
+    ...(canExportTenantAdminData ? ["users", "departments"] : []),
+    "trip-logs",
+    "damage-reports",
+    "handovers"
+  ];
+  const hasFilters = Boolean(
+    searchParams.start ||
+      searchParams.end ||
+      searchParams.vehicleId ||
+      searchParams.userId ||
+      searchParams.departmentId ||
+      searchParams.tripType ||
+      searchParams.damageSeverity
+  );
+  const reportSummary = {
+    bookings: reportData.vehicleUtilization.reduce((sum, vehicle) => sum + vehicle.bookings, 0),
+    distance: reportData.vehicleUtilization.reduce((sum, vehicle) => sum + vehicle.distance, 0),
+    maintenanceCost: reportData.vehicleUtilization.reduce((sum, vehicle) => sum + vehicle.maintenanceCost, 0),
+    damages: reportData.damageBySeverity.reduce((sum, row) => sum + row.count, 0)
+  };
 
   return (
     <div className="grid gap-6">
-      <div>
-        <p className="text-sm font-semibold uppercase text-primary">Analytics</p>
-        <h1 className="mt-2 text-3xl font-semibold">Reports</h1>
-      </div>
+      <PageHeader
+        eyebrow="Analytics"
+        title="Reports"
+        description="Auslastung, Kilometer, Schäden und Buchungen nach Zeitraum und Organisation auswerten."
+      />
 
       <Card>
         <CardHeader>
           <CardTitle>Filter</CardTitle>
         </CardHeader>
         <CardContent>
-          <form className="grid gap-3 md:grid-cols-4 xl:grid-cols-7">
+          <form className="grid gap-3 md:grid-cols-4 xl:grid-cols-[repeat(7,minmax(120px,1fr))_auto_auto]">
             <Field name="start" label="Von" type="date" defaultValue={searchParams.start} />
             <Field name="end" label="Bis" type="date" defaultValue={searchParams.end} />
             <SelectBlock name="vehicleId" label="Fahrzeug" defaultValue={searchParams.vehicleId ?? ""}>
@@ -101,14 +138,26 @@ export default async function ReportsPage({
               ))}
             </SelectBlock>
             <Button variant="outline" className="md:col-span-4 xl:col-span-1">Anwenden</Button>
+            {hasFilters ? (
+              <Button asChild variant="ghost" className="md:col-span-4 xl:col-span-1">
+                <Link href="/reports">Zurücksetzen</Link>
+              </Button>
+            ) : null}
           </form>
         </CardContent>
       </Card>
 
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <ReportSummary label="Buchungen" value={reportSummary.bookings.toLocaleString("de-DE")} />
+        <ReportSummary label="Kilometer" value={`${reportSummary.distance.toLocaleString("de-DE")} km`} />
+        <ReportSummary label="Wartungskosten" value={formatCurrency(reportSummary.maintenanceCost)} />
+        <ReportSummary label="Schäden" value={reportSummary.damages.toLocaleString("de-DE")} />
+      </div>
+
       <div className="flex flex-wrap gap-2">
-        {["vehicles", "bookings", "maintenance", "users", "departments", "trip-logs", "damage-reports", "handovers"].map((type) => (
+        {exportTypes.map((type) => (
           <Button key={type} asChild variant="outline" size="sm">
-            <a href={`/api/export/${type}`}>{type}.csv</a>
+            <a href={`/api/export/${type}`}>{exportLabels[type]} exportieren</a>
           </Button>
         ))}
       </div>
@@ -124,7 +173,7 @@ export default async function ReportsPage({
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Schaeden nach Schweregrad</CardTitle>
+            <CardTitle>Schäden nach Schweregrad</CardTitle>
           </CardHeader>
           <CardContent>
             <DamageSeverityChart data={reportData.damageBySeverity} />
@@ -139,6 +188,15 @@ export default async function ReportsPage({
           </CardContent>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function ReportSummary({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border bg-white p-4">
+      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="mt-2 text-xl font-semibold">{value}</p>
     </div>
   );
 }

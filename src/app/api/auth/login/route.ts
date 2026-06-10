@@ -28,12 +28,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "E-Mail oder Passwort ist falsch." }, { status: 401 });
     }
 
-    if (!user.active || !user.company.active) {
+    if (!user.active || (!user.company.active && user.role !== "PLATFORM_ADMIN")) {
       return NextResponse.json({ error: "Dieses Konto ist nicht aktiv." }, { status: 403 });
     }
 
     await setSessionCookie(user);
-    return NextResponse.json({ ok: true, redirectTo: "/dashboard" });
+    return NextResponse.json({
+      ok: true,
+      redirectTo: user.mustChangePassword ? "/set-password" : user.role === "PLATFORM_ADMIN" ? "/admin" : "/dashboard",
+      mustChangePassword: user.mustChangePassword
+    });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Login fehlgeschlagen." }, { status: 400 });
   }

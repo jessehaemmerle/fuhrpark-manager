@@ -27,6 +27,18 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+When running the app in a VM/WSL environment, the dev and production scripts bind
+Next.js to `0.0.0.0:3000`. If the browser runs outside that VM, either forward
+guest port `3000` to host port `3000` and open `http://localhost:3000`, or open
+the app through the VM IP, for example `http://192.168.x.x:3000`.
+
+If you use a VM IP or a different public hostname, set:
+
+```bash
+NEXT_PUBLIC_APP_URL="http://<host-or-vm-ip>:3000"
+NEXT_ALLOWED_ORIGINS="<host-or-vm-ip>:3000,localhost:3000,127.0.0.1:3000"
+```
+
 This workspace currently has no `node` or `npm` executable available, so commands could not be run locally here.
 
 ## Environment Variables
@@ -35,10 +47,125 @@ This workspace currently has no `node` or `npm` executable available, so command
 DATABASE_URL="postgresql://fleetbase:fleetbase@localhost:5432/fleetbase?schema=public"
 JWT_SECRET="replace-with-a-long-random-secret-at-least-32-characters"
 NEXT_PUBLIC_APP_URL="http://localhost:3000"
+NEXT_ALLOWED_ORIGINS="localhost:3000,127.0.0.1:3000"
+NEXT_IMAGE_REMOTE_HOSTS=""
+SESSION_COOKIE_SECURE=false
 UPLOAD_STORAGE_DRIVER="local"
 ```
 
 Use a strong `JWT_SECRET` in production. Never commit `.env`.
+
+## Production With Reverse Proxy
+
+The production stack uses:
+
+- `postgres` for PostgreSQL
+- `app` for the standalone Next.js server on internal port `3000`
+- `reverse-proxy` for Nginx on public port `80`
+
+Setup:
+
+```bash
+cp .env.production.example .env.production
+```
+
+Edit `.env.production` before the first start:
+
+```bash
+POSTGRES_PASSWORD="use-a-strong-database-password"
+JWT_SECRET="use-a-long-random-secret-at-least-32-characters"
+NEXT_PUBLIC_APP_URL="http://your-domain-or-vm-ip"
+NEXT_ALLOWED_ORIGINS="your-domain-or-vm-ip,localhost,127.0.0.1"
+SESSION_COOKIE_SECURE=false
+SUPER_ADMIN_EMAIL="jesse@haemmerle.at"
+SUPER_ADMIN_PASSWORD="use-a-long-random-admin-password"
+HTTP_PORT=80
+```
+
+The app container generates `DATABASE_URL` from `POSTGRES_USER`,
+`POSTGRES_PASSWORD` and `POSTGRES_DB` at startup. This keeps the app credentials
+and the Postgres credentials in sync.
+
+For HTTP deployments, keep `SESSION_COOKIE_SECURE=false`; otherwise browsers
+drop the login cookie and immediately send you back to `/login`. For HTTPS,
+set `NEXT_PUBLIC_APP_URL` to `https://...` and `SESSION_COOKIE_SECURE=true`.
+
+On every production start the app also upserts a platform admin from
+`SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_PASSWORD`. The password must contain at
+least 16 characters, upper and lower case letters, a number and a special
+character. Changing `SUPER_ADMIN_PASSWORD` and recreating the app container
+resets that admin password.
+
+Start production:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
+
+After Dockerfile changes, rebuild the app image without cache so the old Alpine
+image is not reused:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml down --remove-orphans
+docker compose --env-file .env.production -f docker-compose.prod.yml build --no-cache app
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate
+```
+
+Open `http://your-domain-or-vm-ip`. If the VM is behind port forwarding, forward
+host port `80` to guest port `80`. To use another public port, set `HTTP_PORT`,
+for example `HTTP_PORT=8080`, and open `http://your-domain-or-vm-ip:8080`.
+
+The app container runs `prisma migrate deploy` before starting by default. Set
+`RUN_MIGRATIONS=false` if you want to run migrations manually:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml exec app node node_modules/prisma/build/index.js migrate deploy
+```
+
+Useful production commands:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml ps
+docker compose --env-file .env.production -f docker-compose.prod.yml logs -f app reverse-proxy
+docker compose --env-file .env.production -f docker-compose.prod.yml down
+```
+
+If Prisma reports a missing `libssl.so.1.1` inside `/app/node_modules/.prisma`,
+the server is still running an old Alpine-based app image. Rebuild with the
+`--no-cache app` command above, then verify the engine inside the running
+container:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml exec app sh -lc 'cat /etc/os-release && find node_modules/.prisma/client -name "libquery_engine*" -print'
+```
+
+The app container should report Debian and
+`libquery_engine-debian-openssl-3.0.x.so.node`, not `linux-musl`.
+
+If Prisma reports `Authentication failed against database server at postgres`,
+check whether `POSTGRES_PASSWORD` was changed after the database volume had
+already been created. The official Postgres image only uses `POSTGRES_PASSWORD`
+when initializing an empty volume; it does not update the existing database
+user later. To keep the existing data and sync the password to `.env.production`,
+run:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml stop app reverse-proxy
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d postgres
+docker compose --env-file .env.production -f docker-compose.prod.yml exec -T postgres sh < scripts/sync-postgres-password.sh
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate
+```
+
+The production Postgres healthcheck verifies the configured password with a real
+`psql` login, so a mismatch is visible before the app tries to run migrations.
+
+For a fresh test deployment with no data to keep, you can reset the database
+volume instead:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml down -v
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+```
 
 ## Demo Credentials
 
@@ -51,6 +178,7 @@ Password: FleetbaseDemo123!
 Accounts:
 
 - `admin@fleetbase.example` - PLATFORM_ADMIN
+- `jesse@haemmerle.at` - PLATFORM_ADMIN, password from `SUPER_ADMIN_PASSWORD` when set, otherwise demo password in local seed data
 - `owner@musterlogistik.example` - OWNER, Professional tenant
 - `manager@musterlogistik.example` - FLEET_MANAGER
 - `lisa@musterlogistik.example` - USER
@@ -164,6 +292,7 @@ npm run lint
 npm run typecheck
 npm run test
 npm run db:migrate
+npm run db:migrate:deploy
 npm run db:seed
 npm run db:studio
 ```
@@ -190,7 +319,7 @@ npm run db:studio
 - Legal pages are placeholders and not legal advice
 - In-memory rate limiting is not distributed
 - Report filters apply to chart data, but deeper saved report presets are not implemented
-- No email notifications yet
+- No email notifications yet; password reset links are generated server-side and need an email provider in production
 
 ## Future Stripe Integration Plan
 

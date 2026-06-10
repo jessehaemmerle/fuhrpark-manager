@@ -7,7 +7,7 @@ const labels: Record<UsageMetric, string> = {
   departments: "Abteilungen",
   activeBookings: "Aktive Buchungen",
   monthlyTripLogs: "Fahrten diesen Monat",
-  monthlyDamageReports: "Schaeden diesen Monat"
+  monthlyDamageReports: "Schäden diesen Monat"
 };
 
 export function UsageBars({ usage, plan }: { usage: CompanyUsage; plan: PlanConfig }) {

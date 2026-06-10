@@ -19,6 +19,7 @@ export type AuthenticatedUser = {
   email: string;
   role: UserRole;
   active: boolean;
+  mustChangePassword: boolean;
   driverApproved: boolean;
   driverBlocked: boolean;
   licenseValidUntil: Date | null;
@@ -40,6 +41,23 @@ function getJwtSecret() {
     throw new Error("JWT_SECRET muss in Produktion gesetzt sein.");
   }
   return new TextEncoder().encode(secret ?? "development-only-secret-change-me-please");
+}
+
+function secureSessionCookie() {
+  const configured = process.env.SESSION_COOKIE_SECURE?.toLowerCase();
+  if (configured === "true") return true;
+  if (configured === "false") return false;
+
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (appUrl) {
+    try {
+      return new URL(appUrl).protocol === "https:";
+    } catch {
+      return process.env.NODE_ENV === "production";
+    }
+  }
+
+  return process.env.NODE_ENV === "production";
 }
 
 export async function hashPassword(password: string) {
@@ -72,7 +90,7 @@ export async function setSessionCookie(user: { id: string; companyId: string; ro
   const token = await signSession(user);
   cookies().set(SESSION_COOKIE, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: secureSessionCookie(),
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * SESSION_DAYS
@@ -82,7 +100,7 @@ export async function setSessionCookie(user: { id: string; companyId: string; ro
 export function clearSessionCookie() {
   cookies().set(SESSION_COOKIE, "", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: secureSessionCookie(),
     sameSite: "lax",
     path: "/",
     maxAge: 0
@@ -107,6 +125,7 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
         email: true,
         role: true,
         active: true,
+        mustChangePassword: true,
         driverApproved: true,
         driverBlocked: true,
         licenseValidUntil: true,
@@ -125,7 +144,8 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
       }
     });
 
-    if (!user?.active || !user.company.active) return null;
+    if (!user?.active) return null;
+    if (!user.company.active && user.role !== "PLATFORM_ADMIN") return null;
     return user;
   } catch {
     return null;
@@ -133,6 +153,13 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
 }
 
 export async function requireAuth() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (user.mustChangePassword) redirect("/set-password");
+  return user;
+}
+
+export async function requireAuthForPasswordChange() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   return user;

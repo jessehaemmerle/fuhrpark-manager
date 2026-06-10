@@ -1,4 +1,6 @@
 import { HandoverType } from "@prisma/client";
+import { EmptyState } from "@/components/app/empty-state";
+import { PageHeader } from "@/components/app/page-header";
 import { createHandover } from "@/server/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,7 +15,7 @@ import { prisma } from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
 
 export const metadata = {
-  title: "Uebergaben"
+  title: "Übergaben"
 };
 
 export default async function HandoversPage() {
@@ -40,99 +42,140 @@ export default async function HandoversPage() {
 
   return (
     <div className="grid gap-6">
-      <div>
-        <p className="text-sm font-semibold uppercase text-primary">Vehicle Handover</p>
-        <h1 className="mt-2 text-3xl font-semibold">Uebergaben & Rueckgaben</h1>
-      </div>
+      <PageHeader
+        eyebrow="Übergaben"
+        title="Übergaben & Rückgaben"
+        description="Fahrzeugzustand, Kilometerstand und Schäden bei Übergabe oder Rückgabe dokumentieren."
+        actions={
+          <Button asChild>
+            <a href="#new-handover">Protokoll erfassen</a>
+          </Button>
+        }
+      />
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <Card>
           <CardHeader>
             <CardTitle>Protokolle</CardTitle>
           </CardHeader>
-          <CardContent className="overflow-x-auto">
+          <CardContent>
             <div className="mb-4 flex justify-end">
               <Button asChild variant="outline" size="sm">
                 <a href="/api/export/handovers">CSV exportieren</a>
               </Button>
             </div>
-            <table className="w-full min-w-[820px] text-sm">
-              <thead>
-                <tr className="border-b text-left text-muted-foreground">
-                  <th className="py-3 pr-4">Typ</th>
-                  <th className="py-3 pr-4">Fahrzeug</th>
-                  <th className="py-3 pr-4">Nutzer</th>
-                  <th className="py-3 pr-4">Zeitpunkt</th>
-                  <th className="py-3 pr-4">Kilometer</th>
-                  <th className="py-3 pr-4">Zustand</th>
-                </tr>
-              </thead>
-              <tbody>
-                {handovers.map((handover) => (
-                  <tr key={handover.id} className="border-b last:border-0">
-                    <td className="py-3 pr-4">
-                      <Badge>{handoverTypeLabels[handover.type]}</Badge>
-                    </td>
-                    <td className="py-3 pr-4 font-medium">{handover.vehicle.licensePlate}</td>
-                    <td className="py-3 pr-4">{handover.user.name}</td>
-                    <td className="py-3 pr-4">{formatDateTime(handover.handledAt)}</td>
-                    <td className="py-3 pr-4">{handover.mileage.toLocaleString("de-DE")}</td>
-                    <td className="py-3 pr-4">
-                      {handover.newDamageReported ? <Badge tone="danger">Neuer Schaden</Badge> : <Badge tone="success">OK</Badge>}
-                    </td>
+            <div className="grid gap-3 md:hidden">
+              {handovers.map((handover) => (
+                <div key={handover.id} className="rounded-md border p-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold">{handover.vehicle.licensePlate}</p>
+                      <p className="mt-1 text-muted-foreground">{handover.user.name}</p>
+                    </div>
+                    <Badge>{handoverTypeLabels[handover.type]}</Badge>
+                  </div>
+                  <p className="mt-3 text-muted-foreground">{formatDateTime(handover.handledAt)}</p>
+                  <p className="mt-2">{handover.mileage.toLocaleString("de-DE")} km</p>
+                  <div className="mt-3">
+                    {handover.newDamageReported ? <Badge tone="danger">Neuer Schaden</Badge> : <Badge tone="success">OK</Badge>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[820px] text-sm">
+                <thead>
+                  <tr className="border-b text-left text-muted-foreground">
+                    <th className="py-3 pr-4">Typ</th>
+                    <th className="py-3 pr-4">Fahrzeug</th>
+                    <th className="py-3 pr-4">Nutzer</th>
+                    <th className="py-3 pr-4">Zeitpunkt</th>
+                    <th className="py-3 pr-4">Kilometer</th>
+                    <th className="py-3 pr-4">Zustand</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {handovers.map((handover) => (
+                    <tr key={handover.id} className="border-b last:border-0">
+                      <td className="py-3 pr-4">
+                        <Badge>{handoverTypeLabels[handover.type]}</Badge>
+                      </td>
+                      <td className="py-3 pr-4 font-medium">{handover.vehicle.licensePlate}</td>
+                      <td className="py-3 pr-4">{handover.user.name}</td>
+                      <td className="py-3 pr-4">{formatDateTime(handover.handledAt)}</td>
+                      <td className="py-3 pr-4">{handover.mileage.toLocaleString("de-DE")}</td>
+                      <td className="py-3 pr-4">
+                        {handover.newDamageReported ? <Badge tone="danger">Neuer Schaden</Badge> : <Badge tone="success">OK</Badge>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {handovers.length === 0 ? (
+              <EmptyState
+                title="Keine Protokolle erfasst"
+                description="Übergaben und Rückgaben werden hier chronologisch gesammelt."
+                action={
+                  <Button asChild size="sm">
+                    <a href="#new-handover">Protokoll erfassen</a>
+                  </Button>
+                }
+              />
+            ) : null}
           </CardContent>
         </Card>
 
-        <Card>
+        <Card id="new-handover">
           <CardHeader>
             <CardTitle>Protokoll erfassen</CardTitle>
           </CardHeader>
           <CardContent>
-            <form action={createHandover} className="grid gap-4">
-              <SelectBlock name="vehicleId" label="Fahrzeug">
-                {vehicles.map((vehicle) => (
-                  <option key={vehicle.id} value={vehicle.id}>
-                    {vehicle.licensePlate} · {vehicle.brand} {vehicle.model}
-                  </option>
-                ))}
-              </SelectBlock>
-              <SelectBlock name="bookingId" label="Buchung">
-                <option value="">Ohne Buchung</option>
-                {bookings.map((booking) => (
-                  <option key={booking.id} value={booking.id}>
-                    {booking.vehicle.licensePlate} · {formatDateTime(booking.startAt)}
-                  </option>
-                ))}
-              </SelectBlock>
-              <SelectBlock name="type" label="Typ" defaultValue={HandoverType.HANDOVER}>
-                {Object.values(HandoverType).map((type) => (
-                  <option key={type} value={type}>
-                    {handoverTypeLabels[type]}
-                  </option>
-                ))}
-              </SelectBlock>
-              <Field name="handledAt" label="Zeitpunkt" type="datetime-local" defaultValue={nowInput} />
-              <Field name="mileage" label="Kilometerstand" type="number" />
-              <Field name="energyLevel" label="Tank/Batterie %" type="number" />
-              <TextBlock name="exteriorConditionNote" label="Aussen-Zustand" />
-              <TextBlock name="interiorConditionNote" label="Innen-Zustand" />
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="existingDamageConfirmed" />
-                Bestehende Schaeden bestaetigt
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="newDamageReported" />
-                Neuer Schaden gemeldet
-              </label>
-              <Field name="createDamageTitle" label="Titel neuer Schaden" />
-              <TextBlock name="createDamageDescription" label="Beschreibung neuer Schaden" />
-              <Field name="signatureName" label="Signaturname" />
-              <TextBlock name="photoUrls" label="Foto-URLs" />
-              <Button>Speichern</Button>
-            </form>
+            {vehicles.length === 0 ? (
+              <EmptyState title="Keine Fahrzeuge verfügbar" description="Legen Sie zuerst ein Fahrzeug an, bevor Protokolle erfasst werden können." />
+            ) : (
+              <form action={createHandover} className="grid gap-4">
+                <SelectBlock name="vehicleId" label="Fahrzeug">
+                  {vehicles.map((vehicle) => (
+                    <option key={vehicle.id} value={vehicle.id}>
+                      {vehicle.licensePlate} · {vehicle.brand} {vehicle.model}
+                    </option>
+                  ))}
+                </SelectBlock>
+                <SelectBlock name="bookingId" label="Buchung">
+                  <option value="">Ohne Buchung</option>
+                  {bookings.map((booking) => (
+                    <option key={booking.id} value={booking.id}>
+                      {booking.vehicle.licensePlate} · {formatDateTime(booking.startAt)}
+                    </option>
+                  ))}
+                </SelectBlock>
+                <SelectBlock name="type" label="Typ" defaultValue={HandoverType.HANDOVER}>
+                  {Object.values(HandoverType).map((type) => (
+                    <option key={type} value={type}>
+                      {handoverTypeLabels[type]}
+                    </option>
+                  ))}
+                </SelectBlock>
+                <Field name="handledAt" label="Zeitpunkt" type="datetime-local" defaultValue={nowInput} />
+                <Field name="mileage" label="Kilometerstand" type="number" />
+                <Field name="energyLevel" label="Tank/Batterie (%)" type="number" />
+                <TextBlock name="exteriorConditionNote" label="Außenzustand" />
+                <TextBlock name="interiorConditionNote" label="Innenzustand" />
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" name="existingDamageConfirmed" />
+                  Bestehende Schäden bestätigt
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" name="newDamageReported" />
+                  Neuer Schaden gemeldet
+                </label>
+                <Field name="createDamageTitle" label="Titel neuer Schaden" />
+                <TextBlock name="createDamageDescription" label="Beschreibung neuer Schaden" />
+                <Field name="signatureName" label="Unterschrift Name" />
+                <TextBlock name="photoUrls" label="Foto-URLs" />
+                <Button>Protokoll speichern</Button>
+              </form>
+            )}
           </CardContent>
         </Card>
       </div>

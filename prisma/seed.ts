@@ -5,6 +5,8 @@ import { PrismaClient, SubscriptionTier } from "@prisma/client";
 
 const prisma = new PrismaClient();
 const passwordHash = bcrypt.hashSync("FleetbaseDemo123!", 12);
+const superAdminPassword = process.env.SUPER_ADMIN_PASSWORD ?? "FleetbaseDemo123!";
+const adminPasswordHash = bcrypt.hashSync(superAdminPassword, 12);
 
 function token() {
   return randomBytes(32).toString("base64url");
@@ -51,6 +53,7 @@ async function main() {
   await prisma.tripLog.deleteMany();
   await prisma.booking.deleteMany();
   await prisma.vehicle.deleteMany();
+  await prisma.license.deleteMany();
   await prisma.user.deleteMany();
   await prisma.department.deleteMany();
   await prisma.usageSnapshot.deleteMany();
@@ -65,7 +68,8 @@ async function main() {
       subscriptionTier: "ENTERPRISE",
       trialEndDate: addDays(new Date(), 365),
       primaryBrandColor: "#0f766e",
-      country: "DE"
+      country: "DE",
+      isPlatformCompany: true
     }
   });
 
@@ -97,7 +101,17 @@ async function main() {
     }
   });
 
-  const [platformAdmin, owner, manager, userOne, userTwo, alpinaOwner, alpinaManager, alpinaUser] = await Promise.all([
+  const [jessieAdmin, platformAdmin, owner, manager, userOne, userTwo, alpinaOwner, alpinaManager, alpinaUser] = await Promise.all([
+    prisma.user.create({
+      data: {
+        companyId: platform.id,
+        name: "Jesse Admin",
+        email: "jesse@haemmerle.at",
+        passwordHash: adminPasswordHash,
+        role: "PLATFORM_ADMIN",
+        driverApproved: true
+      }
+    }),
     prisma.user.create({
       data: {
         companyId: platform.id,
@@ -195,6 +209,37 @@ async function main() {
         driverApproved: true,
         licenseClass: "B",
         licenseValidUntil: addDays(new Date(), 120)
+      }
+    })
+  ]);
+
+  await Promise.all([
+    prisma.license.create({
+      data: {
+        companyId: acme.id,
+        createdById: jessieAdmin.id,
+        licenseKey: "FB-DEMO-MUST-2026-PROF",
+        name: "Professional Jahreslizenz",
+        tier: "PROFESSIONAL",
+        validFrom: subDays(new Date(), 5),
+        validUntil: addDays(new Date(), 365),
+        maxUsers: 250,
+        maxVehicles: 75,
+        notes: "Beispieldatensatz fuer das Super-Admin-Panel."
+      }
+    }),
+    prisma.license.create({
+      data: {
+        companyId: alpina.id,
+        createdById: platformAdmin.id,
+        licenseKey: "FB-DEMO-ALPI-2026-BASIC",
+        name: "Basic Lizenz",
+        tier: "BASIC",
+        validFrom: subDays(new Date(), 20),
+        validUntil: addDays(new Date(), 180),
+        maxUsers: 25,
+        maxVehicles: 10,
+        notes: "Aktive Lizenz fuer Demo-Mandant."
       }
     })
   ]);

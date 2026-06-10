@@ -1,12 +1,17 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { RegisterForm } from "@/components/auth/register-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getCurrentUser } from "@/lib/auth";
 
 export const metadata = {
   title: "Registrieren"
 };
 
-export default function RegisterPage() {
+export default async function RegisterPage() {
+  const user = await getCurrentUser();
+  if (user) redirect(user.mustChangePassword ? "/set-password" : user.role === "PLATFORM_ADMIN" ? "/admin" : "/dashboard");
+
   return (
     <main className="container flex min-h-[calc(100vh-8rem)] items-center justify-center py-12">
       <Card className="w-full max-w-lg">

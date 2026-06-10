@@ -15,7 +15,8 @@ const protectedPrefixes = [
   "/reports",
   "/subscription",
   "/settings",
-  "/admin"
+  "/admin",
+  "/set-password"
 ];
 
 export function middleware(request: NextRequest) {
@@ -26,10 +27,6 @@ export function middleware(request: NextRequest) {
     const loginUrl = new URL("/login", request.url);
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
-  }
-
-  if ((pathname === "/login" || pathname === "/register") && hasSession) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return NextResponse.next();
@@ -51,7 +48,6 @@ export const config = {
     "/subscription/:path*",
     "/settings/:path*",
     "/admin/:path*",
-    "/login",
-    "/register"
+    "/set-password"
   ]
 };

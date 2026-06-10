@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -19,6 +20,11 @@ enum SubscriptionTier {
   BASIC
   PROFESSIONAL
   ENTERPRISE
+}
+
+enum LicenseStatus {
+  ACTIVE
+  ARCHIVED
 }
 
 enum VehicleCategory {
@@ -113,6 +119,7 @@ model Company {
   trialStartDate         DateTime           @default(now())
   trialEndDate           DateTime
   active                 Boolean            @default(true)
+  isPlatformCompany      Boolean            @default(false)
   retentionPeriodDays    Int                @default(3650)
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
@@ -121,6 +128,7 @@ model Company {
   damageReports          DamageReport[]
   departments            Department[]
   handovers              VehicleHandover[]
+  licenses               License[]
   maintenanceRecords     MaintenanceRecord[]
   tripLogs               TripLog[]
   usageSnapshots         UsageSnapshot[]
@@ -129,6 +137,31 @@ model Company {
 
   @@index([subscriptionTier])
   @@index([active])
+  @@index([isPlatformCompany])
+}
+
+model License {
+  id            String           @id @default(cuid())
+  companyId     String
+  licenseKey    String           @unique
+  name          String
+  status        LicenseStatus    @default(ACTIVE)
+  tier          SubscriptionTier
+  validFrom     DateTime         @default(now())
+  validUntil    DateTime
+  maxUsers      Int?
+  maxVehicles   Int?
+  notes         String?
+  archivedAt    DateTime?
+  createdById   String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  company       Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy     User?            @relation("LicensesCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status])
+  @@index([status, validUntil])
+  @@index([tier])
 }
 
 model User {
@@ -138,6 +171,12 @@ model User {
   name                 String
   email                String             @unique
   passwordHash         String
+  mustChangePassword   Boolean            @default(false)
+  passwordChangedAt    DateTime?
+  temporaryPasswordIssuedAt DateTime?
+  passwordResetTokenHash String?          @unique
+  passwordResetTokenExpiresAt DateTime?
+  passwordResetRequestedAt DateTime?
   role                 UserRole           @default(USER)
   active               Boolean            @default(true)
   licenseNumber        String?
@@ -157,6 +196,7 @@ model User {
   damageReports        DamageReport[]     @relation("DamageReporter")
   department           Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   handovers            VehicleHandover[]
+  licensesCreated      License[]          @relation("LicensesCreatedBy")
   rejectedBookings     Booking[]          @relation("BookingRejectedBy")
   resolvedDamages      DamageReport[]     @relation("DamageResolvedBy")
   tripLogs             TripLog[]
@@ -164,6 +204,7 @@ model User {
   @@index([companyId, role])
   @@index([companyId, active])
   @@index([departmentId])
+  @@index([passwordResetTokenExpiresAt])
 }
 
 model Department {
