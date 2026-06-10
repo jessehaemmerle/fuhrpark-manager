@@ -5,7 +5,7 @@ import { toCsv } from "@/lib/csv";
 import { assertFeatureAccess, getPlan } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 
-const managerOnly = new Set(["vehicles", "bookings", "maintenance", "users", "departments", "reports"]);
+const managerOnly = new Set(["vehicles", "bookings", "maintenance", "users", "departments"]);
 
 export async function GET(_: Request, { params }: { params: { type: string } }) {
   const user = await getCurrentUser();

@@ -51,7 +51,8 @@ export const vehicleSchema = z.object({
   location: optionalShortText,
   notes: optionalText,
   imageUrl: optionalShortText,
-  qrCodeEnabled: checkbox.default(false)
+  qrCodeEnabled: checkbox.default(false),
+  nextServiceMileage: z.preprocess((v) => (v === "" ? undefined : v), z.coerce.number().int().min(0).optional())
 });
 
 export const bookingSchema = z.object({

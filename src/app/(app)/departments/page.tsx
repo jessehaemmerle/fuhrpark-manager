@@ -1,4 +1,5 @@
 import { createDepartment, deleteDepartment, updateDepartment } from "@/server/actions";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -49,7 +50,14 @@ export default async function DepartmentsPage() {
                 </form>
                 <form action={deleteDepartment}>
                   <input type="hidden" name="departmentId" value={department.id} />
-                  <Button size="sm" variant="destructive">Loeschen</Button>
+                  <ConfirmButton
+                    type="submit"
+                    size="sm"
+                    variant="destructive"
+                    message={`Abteilung "${department.name}" wirklich loeschen?`}
+                  >
+                    Loeschen
+                  </ConfirmButton>
                 </form>
               </CardContent>
             </Card>

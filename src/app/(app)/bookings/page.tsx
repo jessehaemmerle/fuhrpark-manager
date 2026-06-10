@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { BookingStatus } from "@prisma/client";
 import { approveBooking, createBooking, rejectBooking, updateBookingStatus } from "@/server/actions";
 import { Badge } from "@/components/ui/badge";
@@ -37,9 +38,14 @@ export default async function BookingsPage({ searchParams }: { searchParams: { s
 
   return (
     <div className="grid gap-6">
-      <div>
-        <p className="text-sm font-semibold uppercase text-primary">Booking Workflow</p>
-        <h1 className="mt-2 text-3xl font-semibold">Buchungen</h1>
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <p className="text-sm font-semibold uppercase text-primary">Buchungsworkflow</p>
+          <h1 className="mt-2 text-3xl font-semibold">Buchungen</h1>
+        </div>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/bookings/calendar">Kalenderansicht</Link>
+        </Button>
       </div>
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <Card>

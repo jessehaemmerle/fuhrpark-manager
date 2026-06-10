@@ -1,7 +1,9 @@
+import { Children } from "react";
 import Link from "next/link";
 import { FuelType, VehicleCategory, VehicleStatus } from "@prisma/client";
 import { Archive, Download, QrCode, RotateCw } from "lucide-react";
 import { archiveVehicle, disableVehicleQr, regenerateVehicleQr, updateVehicle } from "@/server/actions";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,6 +50,9 @@ export default async function VehicleDetailPage({ params }: { params: { id: stri
 
   return (
     <div className="grid gap-6">
+      <div>
+        <Link href="/vehicles" className="text-sm text-muted-foreground hover:text-foreground">← Alle Fahrzeuge</Link>
+      </div>
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
           <p className="text-sm font-semibold uppercase text-primary">Fahrzeug</p>
@@ -86,7 +91,7 @@ export default async function VehicleDetailPage({ params }: { params: { id: stri
                   {vehicle.qrCodeEnabled && vehicle.qrCodeToken ? (
                     <>
                       <Button asChild variant="outline" size="sm">
-                        <Link href={`/v/${vehicle.qrCodeToken}`}>Workflow oeffnen</Link>
+                        <Link href={`/v/${vehicle.qrCodeToken}`}>QR-Seite oeffnen</Link>
                       </Button>
                       <Button asChild variant="outline" size="sm">
                         <Link href={`/api/vehicles/${vehicle.id}/qr?format=svg`}>
@@ -103,13 +108,22 @@ export default async function VehicleDetailPage({ params }: { params: { id: stri
                   <form action={regenerateVehicleQr}>
                     <input type="hidden" name="vehicleId" value={vehicle.id} />
                     <Button size="sm" variant="outline">
-                      <RotateCw className="h-4 w-4" /> Token erneuern
+                      <RotateCw className="h-4 w-4" /> {vehicle.qrCodeEnabled ? "Token erneuern" : "QR aktivieren"}
                     </Button>
                   </form>
-                  <form action={disableVehicleQr}>
-                    <input type="hidden" name="vehicleId" value={vehicle.id} />
-                    <Button size="sm" variant="destructive">QR deaktivieren</Button>
-                  </form>
+                  {vehicle.qrCodeEnabled ? (
+                    <form action={disableVehicleQr}>
+                      <input type="hidden" name="vehicleId" value={vehicle.id} />
+                      <ConfirmButton
+                        type="submit"
+                        size="sm"
+                        variant="destructive"
+                        message="QR-Code wirklich deaktivieren? Bestehende ausgedruckte Codes funktionieren dann nicht mehr."
+                      >
+                        QR deaktivieren
+                      </ConfirmButton>
+                    </form>
+                  ) : null}
                 </div>
                 <p className="text-muted-foreground">
                   Der QR-Code enthaelt nur einen zufaelligen Token. Mandant und Berechtigung werden serverseitig geprueft.
@@ -187,9 +201,13 @@ export default async function VehicleDetailPage({ params }: { params: { id: stri
               <p>Archivierte Fahrzeuge werden aus aktiven Listen ausgeblendet und der QR-Code wird deaktiviert.</p>
               <form action={archiveVehicle}>
                 <input type="hidden" name="vehicleId" value={vehicle.id} />
-                <Button variant="destructive">
+                <ConfirmButton
+                  type="submit"
+                  variant="destructive"
+                  message="Fahrzeug wirklich archivieren? Der QR-Code wird deaktiviert und das Fahrzeug aus allen aktiven Listen entfernt."
+                >
                   <Archive className="h-4 w-4" /> Fahrzeug archivieren
-                </Button>
+                </ConfirmButton>
               </form>
             </CardContent>
           </Card>
@@ -209,12 +227,15 @@ function Summary({ label, value }: { label: string; value: string | number }) {
 }
 
 function HistorySection({ title, children }: { title: string; children: React.ReactNode }) {
+  const empty = Children.count(children) === 0;
   return (
     <Card>
       <CardHeader>
         <CardTitle>{title}</CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-3">{children}</CardContent>
+      <CardContent className="grid gap-3">
+        {empty ? <p className="text-sm text-muted-foreground">Keine Eintraege.</p> : children}
+      </CardContent>
     </Card>
   );
 }
@@ -250,6 +271,7 @@ function EditVehicleForm({
     location: string | null;
     notes: string | null;
     imageUrl: string | null;
+    nextServiceMileage: number | null;
     qrCodeEnabled: boolean;
   };
 }) {

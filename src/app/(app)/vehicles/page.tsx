@@ -109,6 +109,7 @@ export default async function VehiclesPage({
                   <th className="py-3 pr-4">Status</th>
                   <th className="py-3 pr-4">Kategorie</th>
                   <th className="py-3 pr-4">km</th>
+                  <th className="py-3 pr-4">Service</th>
                   <th className="py-3 pr-4">Naechste Belegung</th>
                   <th className="py-3 pr-4">Aktion</th>
                 </tr>
@@ -126,6 +127,22 @@ export default async function VehiclesPage({
                     </td>
                     <td className="py-3 pr-4">{vehicleCategoryLabels[vehicle.category]}</td>
                     <td className="py-3 pr-4">{vehicle.mileage.toLocaleString("de-DE")}</td>
+                    <td className="py-3 pr-4">
+                      {vehicle.nextServiceMileage != null ? (
+                        (() => {
+                          const km = vehicle.nextServiceMileage - vehicle.mileage;
+                          return km <= 0 ? (
+                            <Badge tone="danger">Faellig</Badge>
+                          ) : km <= 1000 ? (
+                            <Badge tone="warning">{km.toLocaleString("de-DE")} km</Badge>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">{km.toLocaleString("de-DE")} km</span>
+                          );
+                        })()
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
                     <td className="py-3 pr-4 text-muted-foreground">
                       {vehicle.bookings[0]
                         ? `${bookingStatusLabels[vehicle.bookings[0].status]} ab ${formatDateTime(vehicle.bookings[0].startAt)}`
@@ -180,6 +197,7 @@ export function VehicleForm({
     location: string | null;
     notes: string | null;
     imageUrl: string | null;
+    nextServiceMileage: number | null;
     qrCodeEnabled: boolean;
   };
 }) {
@@ -256,6 +274,16 @@ export function VehicleForm({
       <div className="grid gap-2">
         <Label htmlFor="imageUrl">Bild-URL</Label>
         <Input id="imageUrl" name="imageUrl" defaultValue={vehicle?.imageUrl ?? ""} />
+      </div>
+      <div className="grid gap-2">
+        <Label htmlFor="nextServiceMileage">Service-Kilometerstand</Label>
+        <Input
+          id="nextServiceMileage"
+          name="nextServiceMileage"
+          type="number"
+          placeholder="z.B. 50000"
+          defaultValue={vehicle?.nextServiceMileage ?? ""}
+        />
       </div>
       <div className="grid gap-2">
         <Label htmlFor="notes">Notizen</Label>

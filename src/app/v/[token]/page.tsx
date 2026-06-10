@@ -157,7 +157,7 @@ export default async function VehicleQrPage({ params }: { params: { token: strin
                   </option>
                 ))}
               </SelectBlock>
-              <TextBlock name="photoUrls" label="Foto-URLs" />
+              <TextBlock name="photoUrls" label="Foto-URLs (optional)" placeholder="https://... (eine URL pro Zeile)" />
               <Button>Melden</Button>
             </form>
           </CardContent>
@@ -225,11 +225,11 @@ function Field({ name, label, type = "text", defaultValue }: { name: string; lab
   );
 }
 
-function TextBlock({ name, label }: { name: string; label: string }) {
+function TextBlock({ name, label, placeholder }: { name: string; label: string; placeholder?: string }) {
   return (
     <div className="grid gap-2">
       <Label htmlFor={name}>{label}</Label>
-      <Textarea id={name} name={name} />
+      <Textarea id={name} name={name} placeholder={placeholder} />
     </div>
   );
 }

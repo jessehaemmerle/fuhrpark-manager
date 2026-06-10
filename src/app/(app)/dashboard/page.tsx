@@ -5,7 +5,8 @@ import {
   Gauge,
   ShieldAlert,
   TrendingUp,
-  Wrench
+  Wrench,
+  Milestone
 } from "lucide-react";
 import { DashboardChart } from "@/components/app/dashboard-chart";
 import { MetricCard } from "@/components/app/metric-card";
@@ -39,7 +40,9 @@ export default async function DashboardPage() {
           <p className="text-sm font-semibold uppercase text-primary">Dashboard</p>
           <h1 className="mt-2 text-3xl font-semibold">Guten Tag, {user.name}</h1>
           <p className="mt-2 text-muted-foreground">
-            Trial bis {formatDate(data.company.trialEndDate)} · Plan {data.plan.name}
+            {data.company.subscriptionTier === "TRIAL"
+              ? `Testphase bis ${formatDate(data.company.trialEndDate)} · ${data.plan.name}`
+              : `Plan: ${data.plan.name}`}
           </p>
         </div>
         <Badge tone={data.company.subscriptionTier === "TRIAL" ? "warning" : "success"}>
@@ -56,6 +59,9 @@ export default async function DashboardPage() {
         <MetricCard label="Wartung naechste 30 Tage" value={data.metrics.upcomingMaintenanceCount} icon={Wrench} />
         <MetricCard label="Wartungskosten Monat" value={formatCurrency(data.metrics.maintenanceCostsThisMonth)} icon={Wrench} />
         <MetricCard label="Fahrerlaubnis laeuft ab" value={data.metrics.expiringDrivers} icon={ShieldAlert} />
+        {data.metrics.vehiclesNearServiceCount > 0 && (
+          <MetricCard label="Service faellig" value={data.metrics.vehiclesNearServiceCount} icon={Milestone} />
+        )}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -129,6 +135,29 @@ export default async function DashboardPage() {
             ) : null}
           </CardContent>
         </Card>
+        {data.vehiclesNearService.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Service faellig</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {data.vehiclesNearService.map((v) => {
+                const kmLeft = (v.nextServiceMileage ?? 0) - v.mileage;
+                return (
+                  <div key={v.id} className="rounded-md border p-3 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-medium">{v.licensePlate}</p>
+                      <Badge tone={kmLeft <= 0 ? "danger" : "warning"}>
+                        {kmLeft <= 0 ? "Ueberfaellig" : `${kmLeft.toLocaleString("de-DE")} km`}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-muted-foreground">{v.brand} {v.model}</p>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

@@ -9,6 +9,7 @@ import {
   Gauge,
   Home,
   QrCode,
+  ScrollText,
   Settings,
   Shield,
   Users,
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/users", label: "Nutzer", icon: Users, roles: ["FLEET_MANAGER", "OWNER", "PLATFORM_ADMIN"] },
   { href: "/departments", label: "Abteilungen", icon: Building2, roles: ["FLEET_MANAGER", "OWNER", "PLATFORM_ADMIN"] },
   { href: "/reports", label: "Reports", icon: BarChart3, roles: ["FLEET_MANAGER", "OWNER", "PLATFORM_ADMIN"] },
+  { href: "/audit-log", label: "Aktivitaetslog", icon: ScrollText, roles: ["FLEET_MANAGER", "OWNER", "PLATFORM_ADMIN"] },
   { href: "/subscription", label: "Abo & Nutzung", icon: Shield, roles: ["OWNER", "PLATFORM_ADMIN"] },
   { href: "/settings", label: "Einstellungen", icon: Settings, roles: ["OWNER", "PLATFORM_ADMIN"] },
   { href: "/admin", label: "Platform Admin", icon: Shield, roles: ["PLATFORM_ADMIN"] }
@@ -68,12 +70,16 @@ export function AppShell({ user, children }: { user: AuthenticatedUser; children
             </Link>
           ))}
         </nav>
-        <div className="mt-auto rounded-md border bg-zinc-50 p-3 text-sm">
-          <p className="font-medium">Trial Status</p>
-          <p className="mt-1 text-muted-foreground">
-            {trialDaysLeft >= 0 ? `${trialDaysLeft} Tage verbleibend` : "Trial abgelaufen"}
-          </p>
-        </div>
+        {user.company.subscriptionTier === "TRIAL" && (
+          <div className="mt-auto rounded-md border border-amber-200 bg-amber-50 p-3 text-sm">
+            <p className="font-medium text-amber-800">Testphase</p>
+            <p className="mt-1 text-amber-700">
+              {trialDaysLeft > 0
+                ? `${trialDaysLeft} Tage verbleibend`
+                : "Testphase abgelaufen"}
+            </p>
+          </div>
+        )}
       </aside>
       <div className="md:pl-72">
         <header className="sticky top-0 z-30 border-b bg-white/95 backdrop-blur">
@@ -86,6 +92,9 @@ export function AppShell({ user, children }: { user: AuthenticatedUser; children
             </div>
             <div className="flex items-center gap-2">
               {isFleetAdmin(user.role) ? <Badge tone="success">Managerzugriff</Badge> : <Badge>Nutzer</Badge>}
+              <Link href="/profile" className="max-w-32 truncate text-sm hover:underline">
+                {user.name}
+              </Link>
               <LogoutButton />
             </div>
             <nav className="flex w-full gap-2 overflow-x-auto md:hidden">

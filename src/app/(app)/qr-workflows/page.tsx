@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { QrCode } from "lucide-react";
 import { disableVehicleQr, regenerateVehicleQr } from "@/server/actions";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +24,7 @@ export default async function QrWorkflowsPage() {
   return (
     <div className="grid gap-6">
       <div>
-        <p className="text-sm font-semibold uppercase text-primary">QR-Code Vehicle Workflow</p>
+        <p className="text-sm font-semibold uppercase text-primary">QR-Code Workflows</p>
         <h1 className="mt-2 text-3xl font-semibold">QR Workflows</h1>
       </div>
       <Card>
@@ -59,7 +60,7 @@ export default async function QrWorkflowsPage() {
                   {vehicle.qrCodeEnabled && vehicle.qrCodeToken ? (
                     <>
                       <Button asChild size="sm" variant="outline">
-                        <Link href={`/v/${vehicle.qrCodeToken}`}>Oeffnen</Link>
+                        <Link href={`/v/${vehicle.qrCodeToken}`}>QR-Seite oeffnen</Link>
                       </Button>
                       <Button asChild size="sm" variant="outline">
                         <Link href={`/api/vehicles/${vehicle.id}/qr?format=png`}>PNG</Link>
@@ -68,12 +69,23 @@ export default async function QrWorkflowsPage() {
                   ) : null}
                   <form action={regenerateVehicleQr}>
                     <input type="hidden" name="vehicleId" value={vehicle.id} />
-                    <Button size="sm">Regenerieren</Button>
+                    <Button size="sm" variant="outline">
+                      {vehicle.qrCodeEnabled ? "Token erneuern" : "QR aktivieren"}
+                    </Button>
                   </form>
-                  <form action={disableVehicleQr}>
-                    <input type="hidden" name="vehicleId" value={vehicle.id} />
-                    <Button size="sm" variant="destructive">Deaktivieren</Button>
-                  </form>
+                  {vehicle.qrCodeEnabled ? (
+                    <form action={disableVehicleQr}>
+                      <input type="hidden" name="vehicleId" value={vehicle.id} />
+                      <ConfirmButton
+                        type="submit"
+                        size="sm"
+                        variant="destructive"
+                        message={`QR-Code fuer ${vehicle.licensePlate} wirklich deaktivieren? Bestehende ausgedruckte Codes funktionieren dann nicht mehr.`}
+                      >
+                        Deaktivieren
+                      </ConfirmButton>
+                    </form>
+                  ) : null}
                 </div>
               </div>
             );

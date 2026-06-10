@@ -1,5 +1,6 @@
 import { UserRole } from "@prisma/client";
 import { createUser, deactivateUser, updateDriverPermissions, updateUser } from "@/server/actions";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { requireAuth, requireFleetAdmin } from "@/lib/auth";
 import { roleLabels } from "@/lib/labels";
 import { prisma } from "@/lib/prisma";
-import { formatDate } from "@/lib/utils";
 
 export const metadata = {
   title: "Nutzer"
@@ -34,7 +34,7 @@ export default async function UsersPage() {
   return (
     <div className="grid gap-6">
       <div>
-        <p className="text-sm font-semibold uppercase text-primary">User Management</p>
+        <p className="text-sm font-semibold uppercase text-primary">Nutzerverwaltung</p>
         <h1 className="mt-2 text-3xl font-semibold">Nutzer & Fahrerfreigaben</h1>
       </div>
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
@@ -105,10 +105,16 @@ export default async function UsersPage() {
                   {user.id !== actor.id ? (
                     <form action={deactivateUser}>
                       <input type="hidden" name="userId" value={user.id} />
-                      <Button size="sm" variant="destructive">Deaktivieren</Button>
+                      <ConfirmButton
+                        type="submit"
+                        size="sm"
+                        variant="destructive"
+                        message={`${user.name} wirklich deaktivieren? Der Nutzer kann sich danach nicht mehr einloggen.`}
+                      >
+                        Deaktivieren
+                      </ConfirmButton>
                     </form>
                   ) : null}
-                  <p className="text-xs text-muted-foreground">Gueltig bis: {formatDate(user.licenseValidUntil)}</p>
                 </div>
               </CardContent>
             </Card>

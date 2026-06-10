@@ -17,8 +17,10 @@ import {
   requireAuth,
   requireCompanyScope,
   requireFleetAdmin,
-  requireOwner
+  requireOwner,
+  verifyPassword
 } from "@/lib/auth";
+import { bookingApprovedEmail, bookingRejectedEmail, sendEmail } from "@/lib/email";
 import { assertValidTimeRange, assertVehicleAvailability, findActiveTripConflict, validateMileage } from "@/lib/availability";
 import { assertFeatureAccess, assertWithinPlan, getPlan } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
@@ -76,10 +78,13 @@ export async function createVehicle(formData: FormData) {
   const user = await requireAuth();
   requireFleetAdmin(user);
   await assertWithinPlan(user.companyId, "vehicles");
-  const company = await prisma.company.findUniqueOrThrow({ where: { id: user.companyId } });
-  assertFeatureAccess(getPlan(company), "qrCodeAccess");
-
   const data = parseForm(vehicleSchema, formData);
+
+  if (data.qrCodeEnabled) {
+    const company = await prisma.company.findUniqueOrThrow({ where: { id: user.companyId } });
+    assertFeatureAccess(getPlan(company), "qrCodeAccess");
+  }
+
   const vehicle = await prisma.vehicle.create({
     data: {
       ...data,
@@ -104,6 +109,11 @@ export async function updateVehicle(vehicleId: string, formData: FormData) {
   requireFleetAdmin(user);
   const existingVehicle = await getScopedVehicle(vehicleId, user.companyId);
   const data = parseForm(vehicleSchema, formData);
+
+  if (data.qrCodeEnabled && !existingVehicle.qrCodeEnabled) {
+    const company = await prisma.company.findUniqueOrThrow({ where: { id: user.companyId } });
+    assertFeatureAccess(getPlan(company), "qrCodeAccess");
+  }
 
   const vehicle = await prisma.vehicle.update({
     where: { id: vehicleId },
@@ -267,6 +277,26 @@ export async function approveBooking(formData: FormData) {
     entityId: booking.id,
     metadata: { note: data.note }
   });
+
+  prisma.booking.findUnique({
+    where: { id: booking.id },
+    include: {
+      user: { select: { name: true, email: true } },
+      vehicle: { select: { brand: true, model: true, licensePlate: true } }
+    }
+  }).then((b) => {
+    if (!b) return;
+    const { subject, html } = bookingApprovedEmail({
+      userName: b.user.name,
+      vehicleName: `${b.vehicle.brand} ${b.vehicle.model}`,
+      licensePlate: b.vehicle.licensePlate,
+      startAt: b.startAt,
+      endAt: b.endAt,
+      note: data.note
+    });
+    sendEmail({ to: b.user.email, subject, html });
+  }).catch(console.error);
+
   revalidatePath("/bookings");
   revalidatePath("/dashboard");
 }
@@ -295,6 +325,26 @@ export async function rejectBooking(formData: FormData) {
     entityId: booking.id,
     metadata: { note: data.note }
   });
+
+  prisma.booking.findUnique({
+    where: { id: booking.id },
+    include: {
+      user: { select: { name: true, email: true } },
+      vehicle: { select: { brand: true, model: true, licensePlate: true } }
+    }
+  }).then((b) => {
+    if (!b) return;
+    const { subject, html } = bookingRejectedEmail({
+      userName: b.user.name,
+      vehicleName: `${b.vehicle.brand} ${b.vehicle.model}`,
+      licensePlate: b.vehicle.licensePlate,
+      startAt: b.startAt,
+      endAt: b.endAt,
+      note: data.note
+    });
+    sendEmail({ to: b.user.email, subject, html });
+  }).catch(console.error);
+
   revalidatePath("/bookings");
   revalidatePath("/dashboard");
 }
@@ -373,7 +423,7 @@ export async function startTrip(formData: FormData) {
     metadata: { vehicleId: vehicle.id }
   });
   revalidatePath("/trip-log");
-  revalidatePath(`/v/${vehicle.qrCodeToken}`);
+  if (vehicle.qrCodeToken) revalidatePath(`/v/${vehicle.qrCodeToken}`);
   revalidatePath("/dashboard");
 }
 
@@ -946,6 +996,39 @@ export async function changeSubscriptionTier(formData: FormData) {
   });
   revalidatePath("/subscription");
   revalidatePath("/dashboard");
+}
+
+export async function changeOwnPassword(formData: FormData) {
+  const user = await requireAuth();
+  const currentPassword = formData.get("currentPassword");
+  const newPassword = formData.get("newPassword");
+  const confirmPassword = formData.get("confirmPassword");
+
+  if (typeof currentPassword !== "string" || !currentPassword) throw new Error("Aktuelles Passwort fehlt.");
+  if (typeof newPassword !== "string" || newPassword.length < 10) throw new Error("Neues Passwort muss mindestens 10 Zeichen haben.");
+  if (newPassword !== confirmPassword) throw new Error("Die Passwoerter stimmen nicht ueberein.");
+
+  const { passwordHash } = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    select: { passwordHash: true }
+  });
+
+  const valid = await verifyPassword(currentPassword, passwordHash);
+  if (!valid) throw new Error("Das aktuelle Passwort ist falsch.");
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: await hashPassword(newPassword) }
+  });
+
+  await writeAuditLog({
+    companyId: user.companyId,
+    actorUserId: user.id,
+    action: "user.password_changed",
+    entityType: "User",
+    entityId: user.id
+  });
+  revalidatePath("/profile");
 }
 
 export async function assertVehicleTokenAccess(token: string) {
