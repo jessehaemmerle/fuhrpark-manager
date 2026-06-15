@@ -178,7 +178,7 @@ export default async function VehiclesPage({
   );
 }
 
-export function VehicleForm({
+function VehicleForm({
   action,
   vehicle
 }: {

@@ -200,6 +200,10 @@ export const companySettingsSchema = z.object({
   retentionPeriodDays: z.coerce.number().int().min(30).max(3650)
 });
 
+export const subscriptionTierSchema = z.object({
+  tier: z.nativeEnum(SubscriptionTier)
+});
+
 export const platformUserAccessSchema = z.object({
   userId: idSchema,
   role: z.nativeEnum(UserRole),

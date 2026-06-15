@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import {
   BookingStatus,
   DamageStatus,
+  LicenseStatus,
   MaintenanceStatus,
   type UserRole,
   VehicleStatus
@@ -18,6 +19,7 @@ import {
   requireCompanyScope,
   requireFleetAdmin,
   requireOwner,
+  requireRole,
   verifyPassword
 } from "@/lib/auth";
 import { bookingApprovedEmail, bookingRejectedEmail, sendEmail } from "@/lib/email";
@@ -25,7 +27,7 @@ import { assertValidTimeRange, assertVehicleAvailability, findActiveTripConflict
 import { assertFeatureAccess, assertWithinPlan, getPlan } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 import { normalizePhotoUrls, validatePhotoUrls } from "@/lib/upload";
-import { toFormDataObject } from "@/lib/utils";
+import { slugify, toFormDataObject } from "@/lib/utils";
 import {
   bookingDecisionSchema,
   bookingSchema,
@@ -39,6 +41,12 @@ import {
   idSchema,
   maintenanceSchema,
   maintenanceStatusSchema,
+  platformCompanyCreateSchema,
+  platformCompanyUpdateSchema,
+  platformLicenseCreateSchema,
+  platformLicenseIdSchema,
+  platformLicenseUpdateSchema,
+  platformUserAccessSchema,
   subscriptionTierSchema,
   tripCorrectionSchema,
   tripEndSchema,
@@ -353,7 +361,7 @@ export async function updateBookingStatus(formData: FormData) {
   const user = await requireAuth();
   const data = parseForm(bookingStatusSchema, formData);
   const booking = await getScopedBooking(data.bookingId, user.companyId);
-  if (![BookingStatus.CANCELLED, BookingStatus.COMPLETED].includes(data.status)) {
+  if (data.status !== BookingStatus.CANCELLED && data.status !== BookingStatus.COMPLETED) {
     throw new Error("Genehmigungen und Ablehnungen muessen ueber den passenden Workflow erfolgen.");
   }
   const mayUpdateOwn = booking.userId === user.id && data.status === BookingStatus.CANCELLED;
@@ -1048,4 +1056,276 @@ export async function assertVehicleTokenAccess(token: string) {
   });
 
   return vehicle;
+}
+
+// --- Plattform-Administration (Super Admin) -------------------------------
+
+async function uniqueCompanySlug(name: string) {
+  const base = slugify(name) || "firma";
+  let slug = base;
+  let suffix = 2;
+
+  while (await prisma.company.findUnique({ where: { slug }, select: { id: true } })) {
+    slug = `${base}-${suffix}`;
+    suffix += 1;
+  }
+
+  return slug;
+}
+
+function generateLicenseKey() {
+  const raw = randomBytes(10).toString("hex").toUpperCase();
+  return `FB-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}-${raw.slice(12, 16)}-${raw.slice(16, 20)}`;
+}
+
+export async function createPlatformCompany(formData: FormData) {
+  const actor = await requireRole(["PLATFORM_ADMIN"]);
+  const data = parseForm(platformCompanyCreateSchema, formData);
+  const trialStartDate = new Date();
+  const trialEndDate = new Date(trialStartDate.getTime() + data.trialDays * 24 * 60 * 60 * 1000);
+  const slug = await uniqueCompanySlug(data.name);
+
+  const company = await prisma.company.create({
+    data: {
+      name: data.name,
+      slug,
+      address: data.address,
+      country: data.country,
+      contactEmail: data.contactEmail,
+      contactPhone: data.contactPhone,
+      primaryBrandColor: data.primaryBrandColor,
+      subscriptionTier: data.subscriptionTier,
+      active: data.active,
+      trialStartDate,
+      trialEndDate
+    }
+  });
+
+  await writeAuditLog({
+    companyId: company.id,
+    actorUserId: actor.id,
+    action: "company.created",
+    entityType: "Company",
+    entityId: company.id,
+    metadata: { source: "platform_admin", tier: company.subscriptionTier }
+  });
+  revalidatePath("/admin");
+}
+
+export async function updatePlatformCompany(formData: FormData) {
+  const actor = await requireRole(["PLATFORM_ADMIN"]);
+  const data = parseForm(platformCompanyUpdateSchema, formData);
+  const company = await prisma.company.findFirstOrThrow({
+    where: { id: data.companyId, isPlatformCompany: false }
+  });
+
+  await prisma.company.update({
+    where: { id: company.id },
+    data: {
+      name: data.name,
+      address: data.address,
+      country: data.country,
+      contactEmail: data.contactEmail,
+      contactPhone: data.contactPhone,
+      primaryBrandColor: data.primaryBrandColor,
+      subscriptionTier: data.subscriptionTier,
+      active: data.active,
+      trialEndDate: data.trialEndDate
+    }
+  });
+
+  await writeAuditLog({
+    companyId: company.id,
+    actorUserId: actor.id,
+    action: "company.updated",
+    entityType: "Company",
+    entityId: company.id,
+    metadata: { tier: data.subscriptionTier, active: data.active }
+  });
+  revalidatePath("/admin");
+}
+
+export async function createPlatformLicense(formData: FormData) {
+  const actor = await requireRole(["PLATFORM_ADMIN"]);
+  const data = parseForm(platformLicenseCreateSchema, formData);
+  const company = await prisma.company.findFirstOrThrow({
+    where: { id: data.companyId, isPlatformCompany: false }
+  });
+
+  const result = await prisma.$transaction(async (tx) => {
+    const license = await tx.license.create({
+      data: {
+        companyId: company.id,
+        licenseKey: generateLicenseKey(),
+        name: data.name,
+        tier: data.tier,
+        validFrom: data.validFrom,
+        validUntil: data.validUntil,
+        maxUsers: data.maxUsers,
+        maxVehicles: data.maxVehicles,
+        notes: data.notes,
+        createdById: actor.id
+      }
+    });
+
+    let createdUser: { id: string; email: string } | null = null;
+    if (data.createInitialUser && data.initialUserName && data.initialUserEmail && data.initialUserTemporaryPassword) {
+      const existing = await tx.user.findUnique({
+        where: { email: data.initialUserEmail.toLowerCase() },
+        select: { id: true }
+      });
+      if (existing) {
+        throw new Error("Diese E-Mail ist bereits vergeben.");
+      }
+      createdUser = await tx.user.create({
+        data: {
+          companyId: company.id,
+          name: data.initialUserName,
+          email: data.initialUserEmail.toLowerCase(),
+          passwordHash: await hashPassword(data.initialUserTemporaryPassword),
+          role: data.initialUserRole,
+          mustChangePassword: true,
+          temporaryPasswordIssuedAt: new Date(),
+          driverApproved: true,
+          lastLicenseCheckDate: new Date()
+        },
+        select: { id: true, email: true }
+      });
+    }
+
+    return { license, createdUser };
+  });
+
+  await writeAuditLog({
+    companyId: company.id,
+    actorUserId: actor.id,
+    action: "license.created",
+    entityType: "License",
+    entityId: result.license.id,
+    metadata: { tier: result.license.tier, licenseKey: result.license.licenseKey }
+  });
+  if (result.createdUser) {
+    await writeAuditLog({
+      companyId: company.id,
+      actorUserId: actor.id,
+      action: "user.created",
+      entityType: "User",
+      entityId: result.createdUser.id,
+      metadata: { source: "platform_license", role: data.initialUserRole }
+    });
+  }
+  revalidatePath("/admin");
+}
+
+export async function updatePlatformLicense(formData: FormData) {
+  const actor = await requireRole(["PLATFORM_ADMIN"]);
+  const data = parseForm(platformLicenseUpdateSchema, formData);
+  const license = await prisma.license.findFirstOrThrow({
+    where: { id: data.licenseId, company: { isPlatformCompany: false } }
+  });
+  await prisma.company.findFirstOrThrow({
+    where: { id: data.companyId, isPlatformCompany: false }
+  });
+
+  await prisma.license.update({
+    where: { id: license.id },
+    data: {
+      companyId: data.companyId,
+      name: data.name,
+      tier: data.tier,
+      status: data.status,
+      validFrom: data.validFrom,
+      validUntil: data.validUntil,
+      maxUsers: data.maxUsers,
+      maxVehicles: data.maxVehicles,
+      notes: data.notes,
+      archivedAt: data.status === LicenseStatus.ARCHIVED ? license.archivedAt ?? new Date() : null
+    }
+  });
+
+  await writeAuditLog({
+    companyId: data.companyId,
+    actorUserId: actor.id,
+    action: "license.updated",
+    entityType: "License",
+    entityId: license.id,
+    metadata: { tier: data.tier, status: data.status }
+  });
+  revalidatePath("/admin");
+}
+
+export async function archivePlatformLicense(formData: FormData) {
+  const actor = await requireRole(["PLATFORM_ADMIN"]);
+  const data = parseForm(platformLicenseIdSchema, formData);
+  const license = await prisma.license.findFirstOrThrow({
+    where: { id: data.licenseId, company: { isPlatformCompany: false } }
+  });
+
+  await prisma.license.update({
+    where: { id: license.id },
+    data: { status: LicenseStatus.ARCHIVED, archivedAt: license.archivedAt ?? new Date() }
+  });
+
+  await writeAuditLog({
+    companyId: license.companyId,
+    actorUserId: actor.id,
+    action: "license.archived",
+    entityType: "License",
+    entityId: license.id
+  });
+  revalidatePath("/admin");
+}
+
+export async function deletePlatformLicense(formData: FormData) {
+  const actor = await requireRole(["PLATFORM_ADMIN"]);
+  const data = parseForm(platformLicenseIdSchema, formData);
+  const license = await prisma.license.findFirstOrThrow({
+    where: { id: data.licenseId, company: { isPlatformCompany: false } }
+  });
+
+  await prisma.license.delete({ where: { id: license.id } });
+
+  await writeAuditLog({
+    companyId: license.companyId,
+    actorUserId: actor.id,
+    action: "license.deleted",
+    entityType: "License",
+    entityId: license.id
+  });
+  revalidatePath("/admin");
+}
+
+export async function updatePlatformUserAccess(formData: FormData) {
+  const actor = await requireRole(["PLATFORM_ADMIN"]);
+  const data = parseForm(platformUserAccessSchema, formData);
+  const target = await prisma.user.findUniqueOrThrow({ where: { id: data.userId } });
+
+  if (target.id === actor.id && !data.active) {
+    throw new Error("Sie koennen sich nicht selbst deaktivieren.");
+  }
+
+  await prisma.user.update({
+    where: { id: target.id },
+    data: {
+      role: data.role,
+      active: data.active,
+      ...(data.password
+        ? {
+            passwordHash: await hashPassword(data.password),
+            mustChangePassword: true,
+            temporaryPasswordIssuedAt: new Date()
+          }
+        : {})
+    }
+  });
+
+  await writeAuditLog({
+    companyId: target.companyId,
+    actorUserId: actor.id,
+    action: "platform.user_access_changed",
+    entityType: "User",
+    entityId: target.id,
+    metadata: { role: data.role, active: data.active, passwordReset: Boolean(data.password) }
+  });
+  revalidatePath("/admin");
 }
