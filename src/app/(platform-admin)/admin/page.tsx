@@ -109,11 +109,11 @@ export default async function PlatformAdminPage() {
           <form action={createPlatformCompany} className="grid gap-4 lg:grid-cols-4">
             <div className="grid gap-2 lg:col-span-2">
               <Label htmlFor="tenantName">Firmenname</Label>
-              <Input id="tenantName" name="name" autoComplete="organization" />
+              <Input id="tenantName" name="name" autoComplete="organization" required minLength={2} />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="tenantContactEmail">Kontakt-E-Mail</Label>
-              <Input id="tenantContactEmail" name="contactEmail" type="email" autoComplete="email" />
+              <Input id="tenantContactEmail" name="contactEmail" type="email" autoComplete="email" required />
             </div>
             <Field name="contactPhone" label="Telefon" idSuffix="tenant-new" />
             <div className="grid gap-2 lg:col-span-2">
