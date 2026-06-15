@@ -1,0 +1,33 @@
+# Caddyfile für Fuhrpark-Manager
+#
+# Caddy läuft auf dem Host (oder als separater Container) und terminiert
+# HTTPS für deine Domain. Die Requests werden an die App weitergereicht,
+# die im Docker-Stack auf Host-Port 8082 lauscht.
+#
+# 1. "ihre-domain.de" durch deine echte Domain ersetzen.
+# 2. DNS A/AAAA-Record der Domain muss auf diesen Server zeigen.
+# 3. Port 80 + 443 müssen am Server offen sein (für automatisches Let's-Encrypt-Zertifikat).
+#
+# Start (Caddy als Systemdienst):  sudo caddy reload --config /pfad/zur/Caddyfile
+# oder Test im Vordergrund:        caddy run --config ./deploy/caddy/Caddyfile
+
+ihre-domain.de {
+	# Automatisches HTTPS via Let's Encrypt übernimmt Caddy selbst.
+
+	# Antworten komprimieren
+	encode zstd gzip
+
+	# Upload-Limit passend zur App (nginx-Pendant: client_max_body_size 20m)
+	request_body {
+		max_size 20MB
+	}
+
+	# Reverse Proxy auf die App (Docker-Container, Host-Port 8082).
+	# Caddy setzt X-Forwarded-For / X-Forwarded-Proto / Host automatisch.
+	reverse_proxy localhost:8082
+
+	# Optionales Zugriffs-Log
+	log {
+		output file /var/log/caddy/fuhrpark.log
+	}
+}
