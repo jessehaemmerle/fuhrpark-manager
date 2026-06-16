@@ -1,19 +1,31 @@
 import "server-only";
 
+export type EmailAttachment = {
+  filename: string;
+  /** Base64-kodierter Inhalt. */
+  content: string;
+  contentType?: string;
+};
+
 export async function sendEmail({
   to,
   subject,
-  html
+  html,
+  attachments,
+  replyTo
 }: {
   to: string;
   subject: string;
   html: string;
-}) {
+  attachments?: EmailAttachment[];
+  replyTo?: string;
+}): Promise<{ ok: boolean; error?: string }> {
   if (!process.env.RESEND_API_KEY) {
     if (process.env.NODE_ENV !== "production") {
-      console.log(`[Email dev] To: ${to} | Subject: ${subject}`);
+      console.log(`[Email dev] To: ${to} | Subject: ${subject}${attachments?.length ? ` | Anhänge: ${attachments.map((a) => a.filename).join(", ")}` : ""}`);
+      return { ok: true };
     }
-    return;
+    return { ok: false, error: "E-Mail-Versand ist nicht konfiguriert (RESEND_API_KEY fehlt)." };
   }
 
   const res = await fetch("https://api.resend.com/emails", {
@@ -26,13 +38,19 @@ export async function sendEmail({
       from: process.env.EMAIL_FROM ?? "Fuhrpark Manager <noreply@fuhrpark.app>",
       to,
       subject,
-      html
+      html,
+      ...(replyTo ? { reply_to: replyTo } : {}),
+      ...(attachments?.length ? { attachments } : {})
     })
   });
 
   if (!res.ok) {
-    console.error("[Email] Send failed:", res.status, await res.text().catch(() => ""));
+    const detail = await res.text().catch(() => "");
+    console.error("[Email] Send failed:", res.status, detail);
+    return { ok: false, error: `E-Mail-Versand fehlgeschlagen (${res.status}).` };
   }
+
+  return { ok: true };
 }
 
 function wrap(title: string, body: string): string {
@@ -100,6 +118,36 @@ export function bookingRejectedEmail(opts: {
       <p>Ihre Buchungsanfrage wurde leider <strong style="color:#dc2626">abgelehnt</strong>.</p>
       ${table(rows)}
       <p>Sie k&ouml;nnen jederzeit eine neue Anfrage stellen.</p>
+    `)
+  };
+}
+
+export function invoiceIssuedEmail(opts: {
+  recipientName: string;
+  sellerName: string;
+  invoiceNumber: string;
+  issueDate: Date;
+  dueDate: Date;
+  grossFormatted: string;
+  servicePeriod: string;
+  reverseCharge: boolean;
+}): { subject: string; html: string } {
+  const rows: Array<[string, string]> = [
+    ["Rechnungsnummer", opts.invoiceNumber],
+    ["Rechnungsdatum", opts.issueDate.toLocaleDateString("de-AT")],
+    ["Leistungszeitraum", opts.servicePeriod],
+    ["Gesamtbetrag", opts.grossFormatted],
+    ["Zahlbar bis", opts.dueDate.toLocaleDateString("de-AT")]
+  ];
+
+  return {
+    subject: `Rechnung ${opts.invoiceNumber} – ${opts.sellerName}`,
+    html: wrap("Ihre Rechnung", `
+      <p>Sehr geehrte Damen und Herren${opts.recipientName ? ` (${opts.recipientName})` : ""},</p>
+      <p>im Anhang finden Sie Ihre Rechnung als PDF.</p>
+      ${table(rows)}
+      ${opts.reverseCharge ? `<p style="font-size:13px;color:#6b7280">Steuerschuldnerschaft des Leistungsempf&auml;ngers (Reverse Charge).</p>` : ""}
+      <p>Bitte begleichen Sie den Betrag unter Angabe der Rechnungsnummer als Verwendungszweck.</p>
     `)
   };
 }

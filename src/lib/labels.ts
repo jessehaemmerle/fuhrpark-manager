@@ -95,9 +95,22 @@ export const handoverTypeLabels: Record<string, string> = {
   RETURN: "Rückgabe"
 };
 
+export const invoiceStatusLabels: Record<string, string> = {
+  DRAFT: "Entwurf",
+  ISSUED: "Offen",
+  SENT: "Versendet",
+  PAID: "Bezahlt",
+  CANCELLED: "Storniert"
+};
+
+export const invoiceTaxModeLabels: Record<string, string> = {
+  STANDARD: "Standard (USt)",
+  REVERSE_CHARGE: "Reverse Charge"
+};
+
 export function statusTone(status: string) {
-  if (["AVAILABLE", "APPROVED", "COMPLETED", "RESOLVED", "ACTIVE"].includes(status)) return "success";
-  if (["PENDING", "PLANNED", "IN_REVIEW", "SCHEDULED_FOR_REPAIR", "IN_PROGRESS"].includes(status)) return "warning";
+  if (["AVAILABLE", "APPROVED", "COMPLETED", "RESOLVED", "ACTIVE", "PAID", "SENT"].includes(status)) return "success";
+  if (["PENDING", "PLANNED", "IN_REVIEW", "SCHEDULED_FOR_REPAIR", "IN_PROGRESS", "DRAFT", "ISSUED"].includes(status)) return "warning";
   if (["REJECTED", "CANCELLED", "CRITICAL", "DOWNTIME", "RETIRED", "ARCHIVED"].includes(status)) return "danger";
   return "neutral";
 }

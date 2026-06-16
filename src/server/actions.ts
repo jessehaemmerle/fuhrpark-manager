@@ -27,6 +27,7 @@ import { assertValidTimeRange, assertVehicleAvailability, findActiveTripConflict
 import { assertFeatureAccess, assertWithinPlan, getPlan } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 import { normalizePhotoUrls, validatePhotoUrls } from "@/lib/upload";
+import { buildDraftInvoiceData } from "@/lib/invoicing";
 import { slugify, toFormDataObject } from "@/lib/utils";
 import {
   bookingDecisionSchema,
@@ -1093,6 +1094,8 @@ export async function createPlatformCompany(formData: FormData) {
       country: data.country,
       contactEmail: data.contactEmail,
       contactPhone: data.contactPhone,
+      vatId: data.vatId,
+      billingEmail: data.billingEmail,
       primaryBrandColor: data.primaryBrandColor,
       subscriptionTier: data.subscriptionTier,
       active: data.active,
@@ -1127,6 +1130,8 @@ export async function updatePlatformCompany(formData: FormData) {
       country: data.country,
       contactEmail: data.contactEmail,
       contactPhone: data.contactPhone,
+      vatId: data.vatId ?? null,
+      billingEmail: data.billingEmail ?? null,
       primaryBrandColor: data.primaryBrandColor,
       subscriptionTier: data.subscriptionTier,
       active: data.active,
@@ -1193,7 +1198,19 @@ export async function createPlatformLicense(formData: FormData) {
       });
     }
 
-    return { license, createdUser };
+    // Automatischer Rechnungs-Entwurf für die Lizenzperiode (außer Trial).
+    let draftInvoiceId: string | null = null;
+    if (license.tier !== "TRIAL") {
+      const invoiceData = await buildDraftInvoiceData(tx, {
+        company: { id: company.id, country: company.country, vatId: company.vatId },
+        license: { id: license.id, tier: license.tier, validFrom: license.validFrom, validUntil: license.validUntil },
+        createdById: actor.id
+      });
+      const invoice = await tx.invoice.create({ data: invoiceData, select: { id: true } });
+      draftInvoiceId = invoice.id;
+    }
+
+    return { license, createdUser, draftInvoiceId };
   });
 
   await writeAuditLog({
@@ -1214,7 +1231,18 @@ export async function createPlatformLicense(formData: FormData) {
       metadata: { source: "platform_license", role: data.initialUserRole }
     });
   }
+  if (result.draftInvoiceId) {
+    await writeAuditLog({
+      companyId: company.id,
+      actorUserId: actor.id,
+      action: "invoice.draft_created",
+      entityType: "Invoice",
+      entityId: result.draftInvoiceId,
+      metadata: { source: "license_created", licenseId: result.license.id }
+    });
+  }
   revalidatePath("/admin");
+  revalidatePath("/admin/invoices");
 }
 
 export async function updatePlatformLicense(formData: FormData) {

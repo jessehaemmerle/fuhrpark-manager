@@ -105,6 +105,19 @@ enum HandoverType {
   RETURN
 }
 
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  SENT
+  PAID
+  CANCELLED
+}
+
+enum InvoiceTaxMode {
+  STANDARD
+  REVERSE_CHARGE
+}
+
 model Company {
   id                     String             @id @default(cuid())
   name                   String
@@ -115,6 +128,8 @@ model Company {
   country                String             @default("DE")
   contactEmail           String
   contactPhone           String?
+  vatId                  String?
+  billingEmail           String?
   subscriptionTier       SubscriptionTier   @default(TRIAL)
   trialStartDate         DateTime           @default(now())
   trialEndDate           DateTime
@@ -128,6 +143,7 @@ model Company {
   damageReports          DamageReport[]
   departments            Department[]
   handovers              VehicleHandover[]
+  invoices               Invoice[]
   licenses               License[]
   maintenanceRecords     MaintenanceRecord[]
   tripLogs               TripLog[]
@@ -158,6 +174,7 @@ model License {
   updatedAt     DateTime         @updatedAt
   company       Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
   createdBy     User?            @relation("LicensesCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  invoices      Invoice[]
 
   @@index([companyId, status])
   @@index([status, validUntil])
@@ -196,6 +213,7 @@ model User {
   damageReports        DamageReport[]     @relation("DamageReporter")
   department           Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   handovers            VehicleHandover[]
+  invoicesCreated      Invoice[]          @relation("InvoicesCreatedBy")
   licensesCreated      License[]          @relation("LicensesCreatedBy")
   rejectedBookings     Booking[]          @relation("BookingRejectedBy")
   resolvedDamages      DamageReport[]     @relation("DamageResolvedBy")
@@ -458,4 +476,69 @@ model SubscriptionPlanConfig {
   monthlyPriceCents          Int?
   createdAt                  DateTime         @default(now())
   updatedAt                  DateTime         @updatedAt
+}
+
+model Invoice {
+  id                 String           @id @default(cuid())
+  companyId          String
+  licenseId          String?
+  invoiceNumber      String?          @unique
+  status             InvoiceStatus    @default(DRAFT)
+  tier               SubscriptionTier
+  taxMode            InvoiceTaxMode   @default(STANDARD)
+  currency           String           @default("EUR")
+  issueDate          DateTime?
+  servicePeriodStart DateTime
+  servicePeriodEnd   DateTime
+  dueDate            DateTime?
+  netAmountCents     Int              @default(0)
+  taxRatePercent     Int              @default(20)
+  taxAmountCents     Int              @default(0)
+  grossAmountCents   Int              @default(0)
+  lineItems          Json             @default("[]")
+  sellerSnapshot     Json?
+  buyerSnapshot      Json?
+  notes              String?
+  pdf                Bytes?
+  sentAt             DateTime?
+  sentTo             String?
+  paidAt             DateTime?
+  cancelledAt        DateTime?
+  createdById        String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  company            Company          @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  license            License?         @relation(fields: [licenseId], references: [id], onDelete: SetNull)
+  createdBy          User?            @relation("InvoicesCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status])
+  @@index([status])
+  @@index([invoiceNumber])
+  @@index([createdAt])
+}
+
+model PlatformBillingSettings {
+  id                  String   @id @default("platform")
+  legalName           String   @default("")
+  addressLine1        String   @default("")
+  addressLine2        String?
+  postalCode          String   @default("")
+  city                String   @default("")
+  country             String   @default("AT")
+  vatId               String   @default("")
+  registrationInfo    String?
+  email               String   @default("")
+  phone               String?
+  website             String?
+  iban                String?
+  bic                 String?
+  bankName            String?
+  invoiceNumberPrefix String   @default("RE")
+  invoiceCounter      Int      @default(0)
+  taxRatePercent      Int      @default(20)
+  paymentTermsDays    Int      @default(14)
+  footerNote          String?
+  reverseChargeNote   String   @default("Steuerschuldnerschaft des Leistungsempfängers (Reverse Charge gemäß Art. 196 MwSt-SystRL).")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }

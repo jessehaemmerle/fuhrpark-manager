@@ -116,6 +116,8 @@ export default async function PlatformAdminPage() {
               <Input id="tenantContactEmail" name="contactEmail" type="email" autoComplete="email" required />
             </div>
             <Field name="contactPhone" label="Telefon" idSuffix="tenant-new" />
+            <Field name="vatId" label="UID-Nummer (optional)" idSuffix="tenant-new" />
+            <Field name="billingEmail" label="Rechnungs-E-Mail (optional)" type="email" idSuffix="tenant-new" />
             <div className="grid gap-2 lg:col-span-2">
               <Label htmlFor="tenantAddress">Adresse</Label>
               <Textarea id="tenantAddress" name="address" />
@@ -355,6 +357,10 @@ export default async function PlatformAdminPage() {
                   Aktiv
                 </label>
                 <Button size="sm">Speichern</Button>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field name="vatId" label="UID-Nummer (für Reverse Charge)" defaultValue={company.vatId ?? ""} idSuffix={company.id} />
+                <Field name="billingEmail" label="Rechnungs-E-Mail (optional)" type="email" defaultValue={company.billingEmail ?? ""} idSuffix={company.id} />
               </div>
               <input type="hidden" name="country" value={company.country} />
               <input type="hidden" name="primaryBrandColor" value={company.primaryBrandColor} />
