@@ -35,9 +35,27 @@ export function parseDateInput(value: string) {
   return date;
 }
 
+// Sentinel-Datum fuer unbegrenzt gueltige Lizenzen. Die Lizenz selbst speichert
+// dafuer NULL in validUntil; abgeleitete Pflichtfelder (z. B. Company.trialEndDate)
+// erhalten dieses weit in der Zukunft liegende Datum, damit nichts ablaeuft.
+export const UNLIMITED_LICENSE_DATE = new Date(Date.UTC(9999, 11, 31));
+
+// Erkennt sowohl ein fehlendes Datum (Lizenz: validUntil = NULL) als auch das
+// Sentinel-Datum als "unbegrenzt".
+export function isUnlimitedDate(date: Date | string | null | undefined): boolean {
+  if (date === null || date === undefined) return true;
+  return new Date(date).getUTCFullYear() >= 9000;
+}
+
 export function formatDate(date: Date | string | null | undefined) {
   if (!date) return "-";
   return format(new Date(date), "dd.MM.yyyy", { locale: de });
+}
+
+// Wie formatDate, zeigt aber "Unbegrenzt" fuer unbefristete Lizenzen/Zeitraeume.
+export function formatValidUntil(date: Date | string | null | undefined) {
+  if (isUnlimitedDate(date)) return "Unbegrenzt";
+  return formatDate(date);
 }
 
 export function formatDateTime(date: Date | string | null | undefined) {

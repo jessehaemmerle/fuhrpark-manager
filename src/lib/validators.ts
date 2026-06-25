@@ -280,7 +280,8 @@ const platformLicenseBaseShape = {
   name: requiredText("Lizenzname"),
   tier: z.nativeEnum(SubscriptionTier),
   validFrom: z.coerce.date(),
-  validUntil: z.coerce.date(),
+  validUntil: z.coerce.date().optional(),
+  unlimited: checkbox.default(false),
   maxUsers: optionalPositiveInt,
   maxVehicles: optionalPositiveInt,
   notes: optionalText,
@@ -291,7 +292,8 @@ const platformLicenseBaseShape = {
   initialUserTemporaryPassword: optionalShortText
 };
 
-const validLicenseDateRange = <T extends { validFrom: Date; validUntil: Date }>(data: T) => data.validUntil >= data.validFrom;
+const validLicenseDateRange = <T extends { validFrom: Date; validUntil?: Date; unlimited: boolean }>(data: T) =>
+  data.unlimited || (data.validUntil != null && data.validUntil >= data.validFrom);
 const validTenantInitialRole = <T extends { createInitialUser: boolean; initialUserRole: UserRole }>(data: T) =>
   !data.createInitialUser || data.initialUserRole !== UserRole.PLATFORM_ADMIN;
 const validInitialUserFields = <
@@ -309,7 +311,7 @@ const validInitialUserEmail = <T extends { createInitialUser: boolean; initialUs
 const validInitialUserPassword = <T extends { createInitialUser: boolean; initialUserTemporaryPassword?: string }>(data: T) =>
   !data.createInitialUser || !data.initialUserTemporaryPassword || passwordSchema.safeParse(data.initialUserTemporaryPassword).success;
 const licenseDateRangeMessage = {
-  message: "Die Lizenz darf nicht vor dem Startdatum enden.",
+  message: "Bitte ein Ablaufdatum am oder nach dem Startdatum waehlen oder die Lizenz als unbegrenzt markieren.",
   path: ["validUntil"]
 };
 
@@ -339,10 +341,7 @@ export const platformLicenseUpdateSchema = z
     licenseId: idSchema,
     status: z.nativeEnum(LicenseStatus)
   })
-  .refine(validLicenseDateRange, {
-    message: "Die Lizenz darf nicht vor dem Startdatum enden.",
-    path: ["validUntil"]
-  });
+  .refine(validLicenseDateRange, licenseDateRangeMessage);
 
 export const platformLicenseIdSchema = z.object({
   licenseId: idSchema

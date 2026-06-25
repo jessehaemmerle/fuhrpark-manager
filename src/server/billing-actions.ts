@@ -59,9 +59,19 @@ export async function createInvoiceForLicense(formData: FormData) {
     include: { company: { select: { id: true, country: true, vatId: true } } }
   });
 
+  // Unbegrenzte Lizenzen haben kein Ablaufdatum. Fuer den Rechnungszeitraum
+  // wird dann ersatzweise ein Jahr ab Lizenzbeginn abgerechnet.
+  const invoiceValidUntil =
+    license.validUntil ??
+    (() => {
+      const fallback = new Date(license.validFrom);
+      fallback.setFullYear(fallback.getFullYear() + 1);
+      return fallback;
+    })();
+
   const data = await buildDraftInvoiceData(prisma, {
     company: license.company,
-    license: { id: license.id, tier: license.tier, validFrom: license.validFrom, validUntil: license.validUntil },
+    license: { id: license.id, tier: license.tier, validFrom: license.validFrom, validUntil: invoiceValidUntil },
     createdById: actor.id
   });
   const invoice = await prisma.invoice.create({ data });

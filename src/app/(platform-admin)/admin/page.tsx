@@ -20,7 +20,7 @@ import { requireRole } from "@/lib/auth";
 import { licenseStatusLabels, roleLabels, statusTone, tierLabels } from "@/lib/labels";
 import { getCompanyUsage, getPlan } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatValidUntil, isUnlimitedDate } from "@/lib/utils";
 
 export const metadata = {
   title: "Super Admin"
@@ -179,6 +179,10 @@ export default async function PlatformAdminPage() {
             </div>
             <Field name="validFrom" label="Gueltig ab" type="date" defaultValue={dateInputValue(new Date())} />
             <Field name="validUntil" label="Gueltig bis" type="date" defaultValue={futureDateInput(365)} />
+            <label className="flex items-center gap-2 self-end pb-2 text-sm font-medium">
+              <input type="checkbox" name="unlimited" />
+              Unbegrenzt gueltig (kein Ablauf)
+            </label>
             <Field name="maxUsers" label="Nutzerlimit" type="number" />
             <Field name="maxVehicles" label="Fahrzeuglimit" type="number" />
             <div className="grid gap-4 rounded-md border bg-muted/20 p-4 lg:col-span-4">
@@ -255,7 +259,7 @@ export default async function PlatformAdminPage() {
                   <div className="flex flex-wrap gap-2">
                     <Badge tone={statusTone(license.status)}>{licenseStatusLabels[license.status]}</Badge>
                     <Badge>{tierLabels[license.tier]}</Badge>
-                    <Badge>Bis {formatDate(license.validUntil)}</Badge>
+                    <Badge>{license.validUntil ? `Bis ${formatDate(license.validUntil)}` : "Unbegrenzt"}</Badge>
                   </div>
                 </div>
                 <form action={updatePlatformLicense} className="grid gap-3 lg:grid-cols-6">
@@ -295,7 +299,17 @@ export default async function PlatformAdminPage() {
                     </SelectField>
                   </div>
                   <Field name="validFrom" label="Gueltig ab" type="date" defaultValue={dateInputValue(license.validFrom)} idSuffix={license.id} />
-                  <Field name="validUntil" label="Gueltig bis" type="date" defaultValue={dateInputValue(license.validUntil)} idSuffix={license.id} />
+                  <Field
+                    name="validUntil"
+                    label="Gueltig bis"
+                    type="date"
+                    defaultValue={license.validUntil ? dateInputValue(license.validUntil) : futureDateInput(365)}
+                    idSuffix={license.id}
+                  />
+                  <label className="flex items-center gap-2 self-end pb-2 text-sm font-medium" htmlFor={`unlimited-${license.id}`}>
+                    <input type="checkbox" id={`unlimited-${license.id}`} name="unlimited" defaultChecked={license.validUntil === null} />
+                    Unbegrenzt
+                  </label>
                   <Field name="maxUsers" label="Nutzerlimit" type="number" defaultValue={limitValue(license.maxUsers)} idSuffix={license.id} />
                   <Field name="maxVehicles" label="Fahrzeuglimit" type="number" defaultValue={limitValue(license.maxVehicles)} idSuffix={license.id} />
                   <div className="grid gap-2 lg:col-span-2">
@@ -374,7 +388,7 @@ export default async function PlatformAdminPage() {
                 <div className="flex flex-wrap gap-2">
                   <Badge tone={company.active ? "success" : "danger"}>{company.active ? "Aktiv" : "Gesperrt"}</Badge>
                   <Badge>{tierLabels[company.subscriptionTier]}</Badge>
-                  <Badge>Trial/Lizenz bis {formatDate(company.trialEndDate)}</Badge>
+                  <Badge>{isUnlimitedDate(company.trialEndDate) ? "Lizenz unbegrenzt" : `Trial/Lizenz bis ${formatDate(company.trialEndDate)}`}</Badge>
                 </div>
               </div>
             </form>

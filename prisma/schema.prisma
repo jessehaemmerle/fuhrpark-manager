@@ -172,7 +172,7 @@ model License {
   status        LicenseStatus    @default(ACTIVE)
   tier          SubscriptionTier
   validFrom     DateTime         @default(now())
-  validUntil    DateTime
+  validUntil    DateTime?
   maxUsers      Int?
   maxVehicles   Int?
   notes         String?

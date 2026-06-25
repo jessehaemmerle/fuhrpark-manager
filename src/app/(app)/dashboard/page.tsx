@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDashboardData } from "@/lib/dashboard";
 import { bookingStatusLabels, maintenanceStatusLabels, statusTone } from "@/lib/labels";
 import { requireAuth } from "@/lib/auth";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDateTime, formatValidUntil } from "@/lib/utils";
 
 export const metadata = {
   title: "Dashboard"
@@ -41,7 +41,7 @@ export default async function DashboardPage() {
           <h1 className="mt-2 text-3xl font-semibold">Guten Tag, {user.name}</h1>
           <p className="mt-2 text-muted-foreground">
             {data.company.subscriptionTier === "TRIAL"
-              ? `Testphase bis ${formatDate(data.company.trialEndDate)} · ${data.plan.name}`
+              ? `Testphase bis ${formatValidUntil(data.company.trialEndDate)} · ${data.plan.name}`
               : `Plan: ${data.plan.name}`}
           </p>
         </div>

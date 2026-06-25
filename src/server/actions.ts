@@ -28,7 +28,7 @@ import { notifyCompanyManagers, notifyUser } from "@/lib/notifications";
 import { assertFeatureAccess, assertWithinPlan, getPlan } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 import { normalizePhotoUrls, validatePhotoUrls } from "@/lib/upload";
-import { slugify, toFormDataObject } from "@/lib/utils";
+import { slugify, toFormDataObject, UNLIMITED_LICENSE_DATE } from "@/lib/utils";
 import {
   bookingDecisionSchema,
   bookingSchema,
@@ -122,7 +122,9 @@ async function syncCompanyFromLatestActiveLicense(companyId: string) {
 
   const activeLicense = await prisma.license.findFirst({
     where: { companyId, status: "ACTIVE" },
-    orderBy: [{ validUntil: "desc" }, { createdAt: "desc" }]
+    // Unbegrenzte Lizenzen (validUntil = NULL) zaehlen als am weitesten in der
+    // Zukunft liegend und werden daher zuerst gewaehlt.
+    orderBy: [{ validUntil: { sort: "desc", nulls: "first" } }, { createdAt: "desc" }]
   });
 
   if (activeLicense) {
@@ -130,7 +132,8 @@ async function syncCompanyFromLatestActiveLicense(companyId: string) {
       where: { id: companyId },
       data: {
         subscriptionTier: activeLicense.tier,
-        trialEndDate: activeLicense.validUntil,
+        // Pflichtfeld: unbegrenzte Lizenz -> Sentinel-Datum, sonst das Ablaufdatum.
+        trialEndDate: activeLicense.validUntil ?? UNLIMITED_LICENSE_DATE,
         active: true
       }
     });
@@ -1193,7 +1196,7 @@ export async function createPlatformLicense(formData: FormData) {
         name: data.name,
         tier: data.tier,
         validFrom: data.validFrom,
-        validUntil: data.validUntil,
+        validUntil: data.unlimited ? null : data.validUntil ?? null,
         maxUsers: data.maxUsers ?? null,
         maxVehicles: data.maxVehicles ?? null,
         notes: data.notes ?? null,
@@ -1231,7 +1234,7 @@ export async function createPlatformLicense(formData: FormData) {
     metadata: {
       licenseKey: result.license.licenseKey,
       tier: result.license.tier,
-      validUntil: result.license.validUntil.toISOString(),
+      validUntil: result.license.validUntil?.toISOString() ?? null,
       initialUserEmail: result.initialUser?.email
     }
   });
@@ -1270,7 +1273,7 @@ export async function updatePlatformLicense(formData: FormData) {
       status: data.status,
       tier: data.tier,
       validFrom: data.validFrom,
-      validUntil: data.validUntil,
+      validUntil: data.unlimited ? null : data.validUntil ?? null,
       maxUsers: data.maxUsers ?? null,
       maxVehicles: data.maxVehicles ?? null,
       notes: data.notes ?? null,

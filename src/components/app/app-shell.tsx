@@ -7,6 +7,7 @@ import { QuickActions } from "@/components/app/quick-actions";
 import { Badge } from "@/components/ui/badge";
 import { type AuthenticatedUser, isFleetAdmin } from "@/lib/auth";
 import { roleLabels, tierLabels } from "@/lib/labels";
+import { isUnlimitedDate } from "@/lib/utils";
 
 export function AppShell({
   user,
@@ -17,6 +18,7 @@ export function AppShell({
   unreadNotifications?: number;
   children: React.ReactNode;
 }) {
+  const unlimitedLicense = isUnlimitedDate(user.company.trialEndDate);
   const trialDaysLeft = differenceInCalendarDays(user.company.trialEndDate, new Date());
 
   return (
@@ -38,7 +40,7 @@ export function AppShell({
         <div className="mt-auto rounded-md border bg-zinc-50 p-3 text-sm">
           <p className="font-medium">Abo-Status</p>
           <p className="mt-1 text-muted-foreground">
-            {trialDaysLeft >= 0 ? `${trialDaysLeft} Tage verbleibend` : "Trial abgelaufen"}
+            {unlimitedLicense ? "Unbegrenzt gueltig" : trialDaysLeft >= 0 ? `${trialDaysLeft} Tage verbleibend` : "Trial abgelaufen"}
           </p>
         </div>
       </aside>

@@ -10,7 +10,7 @@ import { requireAuth, requireOwner } from "@/lib/auth";
 import { tierLabels } from "@/lib/labels";
 import { getCompanyUsage, getPlan } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
-import { formatDate } from "@/lib/utils";
+import { formatValidUntil } from "@/lib/utils";
 
 export const metadata = {
   title: "Abo & Nutzung"
@@ -29,7 +29,7 @@ export default async function SubscriptionPage() {
         <p className="text-sm font-semibold uppercase text-primary">Abonnement</p>
         <h1 className="mt-2 text-3xl font-semibold">Abo & Nutzung</h1>
         {company.subscriptionTier === "TRIAL" ? (
-          <p className="mt-2 text-muted-foreground">Testphase endet am {formatDate(company.trialEndDate)}.</p>
+          <p className="mt-2 text-muted-foreground">Testphase endet am {formatValidUntil(company.trialEndDate)}.</p>
         ) : (
           <p className="mt-2 text-muted-foreground">Aktiver Plan: {plan.name}</p>
         )}
