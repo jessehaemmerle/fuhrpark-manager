@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Car } from "lucide-react";
+import { Bell, Car } from "lucide-react";
 import { differenceInCalendarDays } from "date-fns";
 import { AppNavigation } from "@/components/app/app-nav";
 import { LogoutButton } from "@/components/app/logout-button";
@@ -8,7 +8,15 @@ import { Badge } from "@/components/ui/badge";
 import { type AuthenticatedUser, isFleetAdmin } from "@/lib/auth";
 import { roleLabels, tierLabels } from "@/lib/labels";
 
-export function AppShell({ user, children }: { user: AuthenticatedUser; children: React.ReactNode }) {
+export function AppShell({
+  user,
+  unreadNotifications = 0,
+  children
+}: {
+  user: AuthenticatedUser;
+  unreadNotifications?: number;
+  children: React.ReactNode;
+}) {
   const trialDaysLeft = differenceInCalendarDays(user.company.trialEndDate, new Date());
 
   return (
@@ -45,6 +53,18 @@ export function AppShell({ user, children }: { user: AuthenticatedUser; children
             </div>
             <div className="flex items-center gap-2">
               {isFleetAdmin(user.role) ? <Badge tone="success">Managerzugriff</Badge> : <Badge>Nutzer</Badge>}
+              <Link
+                href="/notifications"
+                aria-label={`Benachrichtigungen${unreadNotifications > 0 ? ` (${unreadNotifications} ungelesen)` : ""}`}
+                className="relative flex h-9 w-9 items-center justify-center rounded-md border bg-white text-zinc-700 transition-colors hover:bg-zinc-100"
+              >
+                <Bell className="h-4 w-4" aria-hidden />
+                {unreadNotifications > 0 ? (
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-semibold text-white">
+                    {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                  </span>
+                ) : null}
+              </Link>
               <LogoutButton />
             </div>
             <QuickActions role={user.role} />

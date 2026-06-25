@@ -95,9 +95,69 @@ export const handoverTypeLabels: Record<string, string> = {
   RETURN: "Rückgabe"
 };
 
+export const notificationTypeLabels: Record<string, string> = {
+  BOOKING_REQUESTED: "Buchungsanfrage",
+  BOOKING_APPROVED: "Buchung genehmigt",
+  BOOKING_REJECTED: "Buchung abgelehnt",
+  BOOKING_OVERDUE: "Buchung überfällig",
+  DAMAGE_REPORTED: "Schaden gemeldet",
+  MAINTENANCE_DUE: "Wartung fällig",
+  DEADLINE_DUE: "Frist fällig",
+  LICENSE_EXPIRING: "Fahrerlaubnis läuft ab",
+  LICENSE_CHECK_DUE: "Führerscheinkontrolle fällig",
+  INVITATION: "Einladung",
+  GENERAL: "Hinweis"
+};
+
+export const documentTypeLabels: Record<string, string> = {
+  REGISTRATION: "Zulassung / Fahrzeugschein",
+  INSURANCE: "Versicherung",
+  LEASING: "Leasingvertrag",
+  INSPECTION: "HU/AU-Bericht",
+  SERVICE_RECORD: "Servicenachweis",
+  OTHER: "Sonstiges"
+};
+
+export const deadlineTypeLabels: Record<string, string> = {
+  HU: "Hauptuntersuchung (TÜV)",
+  AU: "Abgasuntersuchung",
+  INSPECTION: "Inspektion / Service",
+  INSURANCE: "Versicherung",
+  LEASING_END: "Leasing-Ende",
+  TIRE_CHANGE: "Reifenwechsel",
+  TAX: "Kfz-Steuer",
+  OTHER: "Sonstige Frist"
+};
+
+export const costCategoryLabels: Record<string, string> = {
+  FUEL: "Kraftstoff",
+  CHARGING: "Ladestrom",
+  MAINTENANCE: "Wartung / Reparatur",
+  INSURANCE: "Versicherung",
+  LEASING: "Leasing / Finanzierung",
+  TAX: "Steuer",
+  FINE: "Bußgeld",
+  CLEANING: "Reinigung",
+  TOLL: "Maut",
+  OTHER: "Sonstige"
+};
+
+export const licenseCheckResultLabels: Record<string, string> = {
+  VALID: "Gültig vorgelegt",
+  INVALID: "Ungültig / Beanstandung",
+  NOT_PRESENTED: "Nicht vorgelegt"
+};
+
+export const invitationStatusLabels: Record<string, string> = {
+  PENDING: "Offen",
+  ACCEPTED: "Angenommen",
+  REVOKED: "Zurückgezogen",
+  EXPIRED: "Abgelaufen"
+};
+
 export function statusTone(status: string) {
-  if (["AVAILABLE", "APPROVED", "COMPLETED", "RESOLVED", "ACTIVE"].includes(status)) return "success";
-  if (["PENDING", "PLANNED", "IN_REVIEW", "SCHEDULED_FOR_REPAIR", "IN_PROGRESS"].includes(status)) return "warning";
-  if (["REJECTED", "CANCELLED", "CRITICAL", "DOWNTIME", "RETIRED", "ARCHIVED"].includes(status)) return "danger";
+  if (["AVAILABLE", "APPROVED", "COMPLETED", "RESOLVED", "ACTIVE", "VALID", "ACCEPTED"].includes(status)) return "success";
+  if (["PENDING", "PLANNED", "IN_REVIEW", "SCHEDULED_FOR_REPAIR", "IN_PROGRESS", "NOT_PRESENTED"].includes(status)) return "warning";
+  if (["REJECTED", "CANCELLED", "CRITICAL", "DOWNTIME", "RETIRED", "ARCHIVED", "INVALID", "REVOKED", "EXPIRED"].includes(status)) return "danger";
   return "neutral";
 }

@@ -54,3 +54,14 @@ export function driverBlockReason(driver: {
 export function isFleetAdminRole(role: string) {
   return role === "OWNER" || role === "FLEET_MANAGER" || role === "PLATFORM_ADMIN";
 }
+
+/**
+ * QR codes are a plan feature. The feature gate must only block when a QR code is
+ * being newly enabled — never when creating/editing a vehicle that keeps QR off,
+ * and never when re-saving a vehicle that already had QR enabled. For creation
+ * there is no previous state, so the default (`false`) makes the gate fire purely
+ * on whether QR is being switched on.
+ */
+export function qrFeatureGateRequired(nextEnabled: boolean, previousEnabled = false) {
+  return nextEnabled && !previousEnabled;
+}

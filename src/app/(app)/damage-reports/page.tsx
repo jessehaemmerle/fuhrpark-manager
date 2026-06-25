@@ -1,6 +1,7 @@
 import { DamageSeverity, DamageStatus, Prisma } from "@prisma/client";
 import Link from "next/link";
 import { EmptyState } from "@/components/app/empty-state";
+import { FileUploader } from "@/components/app/file-uploader";
 import { PageHeader } from "@/components/app/page-header";
 import { createDamageReport, updateDamageStatus } from "@/server/actions";
 import { Badge } from "@/components/ui/badge";
@@ -273,8 +274,8 @@ export default async function DamageReportsPage({
                   </SelectField>
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="photoUrls">Foto-URLs</Label>
-                  <Textarea id="photoUrls" name="photoUrls" placeholder="/uploads/schaden-1.webp oder https://..." />
+                  <Label>Fotos</Label>
+                  <FileUploader name="photoUrls" kind="photo" label="Fotos hochladen" />
                 </div>
                 <Button>Schaden melden</Button>
               </form>

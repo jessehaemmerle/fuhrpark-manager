@@ -22,6 +22,8 @@ import {
   requireRole
 } from "@/lib/auth";
 import { assertValidTimeRange, assertVehicleAvailability, findActiveTripConflict, validateMileage } from "@/lib/availability";
+import { qrFeatureGateRequired } from "@/lib/domain-rules";
+import { notifyCompanyManagers, notifyUser } from "@/lib/notifications";
 import { assertFeatureAccess, assertWithinPlan, getPlan } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 import { normalizePhotoUrls, validatePhotoUrls } from "@/lib/upload";
@@ -166,10 +168,13 @@ export async function createVehicle(formData: FormData) {
   const user = await requireAuth();
   requireFleetAdmin(user);
   await assertWithinPlan(user.companyId, "vehicles");
-  const company = await prisma.company.findUniqueOrThrow({ where: { id: user.companyId } });
-  assertFeatureAccess(getPlan(company), "qrCodeAccess");
 
   const data = parseForm(vehicleSchema, formData);
+  if (qrFeatureGateRequired(data.qrCodeEnabled)) {
+    const company = await prisma.company.findUniqueOrThrow({ where: { id: user.companyId } });
+    assertFeatureAccess(getPlan(company), "qrCodeAccess");
+  }
+
   const vehicle = await prisma.vehicle.create({
     data: {
       ...data,
@@ -194,6 +199,11 @@ export async function updateVehicle(vehicleId: string, formData: FormData) {
   requireFleetAdmin(user);
   const existingVehicle = await getScopedVehicle(vehicleId, user.companyId);
   const data = parseForm(vehicleSchema, formData);
+
+  if (qrFeatureGateRequired(data.qrCodeEnabled, existingVehicle.qrCodeEnabled)) {
+    const company = await prisma.company.findUniqueOrThrow({ where: { id: user.companyId } });
+    assertFeatureAccess(getPlan(company), "qrCodeAccess");
+  }
 
   const vehicle = await prisma.vehicle.update({
     where: { id: vehicleId },
@@ -316,6 +326,18 @@ export async function createBooking(formData: FormData) {
     entityId: booking.id,
     metadata: { vehicleId: data.vehicleId }
   });
+  await notifyCompanyManagers(
+    user.companyId,
+    {
+      type: "BOOKING_REQUESTED",
+      title: `Neue Buchungsanfrage: ${vehicle.licensePlate}`,
+      body: `${user.name} hat ${vehicle.licensePlate} angefragt.`,
+      url: "/bookings",
+      entityType: "Booking",
+      entityId: booking.id
+    },
+    { excludeUserId: user.id }
+  );
   revalidatePath("/bookings");
   revalidatePath("/dashboard");
 }
@@ -357,6 +379,16 @@ export async function approveBooking(formData: FormData) {
     entityId: booking.id,
     metadata: { note: data.note }
   });
+  await notifyUser({
+    companyId: user.companyId,
+    userId: booking.userId,
+    type: "BOOKING_APPROVED",
+    title: "Buchung genehmigt",
+    body: data.note ? `Hinweis: ${data.note}` : "Ihre Buchung wurde genehmigt.",
+    url: "/bookings",
+    entityType: "Booking",
+    entityId: booking.id
+  });
   revalidatePath("/bookings");
   revalidatePath("/dashboard");
 }
@@ -384,6 +416,16 @@ export async function rejectBooking(formData: FormData) {
     entityType: "Booking",
     entityId: booking.id,
     metadata: { note: data.note }
+  });
+  await notifyUser({
+    companyId: user.companyId,
+    userId: booking.userId,
+    type: "BOOKING_REJECTED",
+    title: "Buchung abgelehnt",
+    body: data.note ? `Grund: ${data.note}` : "Ihre Buchung wurde abgelehnt.",
+    url: "/bookings",
+    entityType: "Booking",
+    entityId: booking.id
   });
   revalidatePath("/bookings");
   revalidatePath("/dashboard");
@@ -617,7 +659,7 @@ export async function createDamageReport(formData: FormData) {
   const user = await requireAuth();
   await assertWithinPlan(user.companyId, "monthlyDamageReports");
   const data = parseForm(damageSchema, formData);
-  await getScopedVehicle(data.vehicleId, user.companyId);
+  const vehicle = await getScopedVehicle(data.vehicleId, user.companyId);
   if (data.bookingId) {
     const booking = await getScopedBooking(data.bookingId, user.companyId);
     if (booking.vehicleId !== data.vehicleId) throw new Error("Die Buchung gehoert nicht zu diesem Fahrzeug.");
@@ -660,6 +702,18 @@ export async function createDamageReport(formData: FormData) {
     entityId: report.id,
     metadata: { severity: report.severity, vehicleId: report.vehicleId }
   });
+  await notifyCompanyManagers(
+    user.companyId,
+    {
+      type: "DAMAGE_REPORTED",
+      title: "Neuer Schaden gemeldet",
+      body: `${report.title} (${report.severity}) – ${vehicle.licensePlate}`,
+      url: "/damage-reports",
+      entityType: "DamageReport",
+      entityId: report.id
+    },
+    { excludeUserId: user.id }
+  );
   revalidatePath("/damage-reports");
   revalidatePath("/dashboard");
 }

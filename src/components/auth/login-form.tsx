@@ -20,6 +20,8 @@ function redirectTarget(fallback = "/dashboard", ignoreNext = false) {
 
 export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
+  const [twoFactorRequired, setTwoFactorRequired] = useState(false);
+  const [code, setCode] = useState("");
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" }
@@ -32,10 +34,15 @@ export function LoginForm() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values)
+        body: JSON.stringify(twoFactorRequired ? { ...values, code } : values)
       });
       const payload = await response.json().catch(() => ({}));
+      if (payload.twoFactorRequired && !payload.error) {
+        setTwoFactorRequired(true);
+        return;
+      }
       if (!response.ok) {
+        if (payload.twoFactorRequired) setTwoFactorRequired(true);
         setError(payload.error ?? "Login fehlgeschlagen.");
         return;
       }
@@ -59,6 +66,20 @@ export function LoginForm() {
           <p className="text-sm text-red-600">{form.formState.errors.password.message}</p>
         ) : null}
       </div>
+      {twoFactorRequired ? (
+        <div className="grid gap-2">
+          <Label htmlFor="code">Authenticator-Code</Label>
+          <Input
+            id="code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            placeholder="6-stelliger Code oder Recovery-Code"
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">Code aus Ihrer Authenticator-App oder ein Recovery-Code.</p>
+        </div>
+      ) : null}
       {error ? <p className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
       <Button disabled={form.formState.isSubmitting}>
         {form.formState.isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}

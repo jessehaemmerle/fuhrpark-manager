@@ -8,6 +8,7 @@ import {
   hasActiveTripConflict,
   hasBlockingMaintenanceConflict,
   isFleetAdminRole,
+  qrFeatureGateRequired,
   rangesOverlap
 } from "../src/lib/domain-rules";
 
@@ -70,6 +71,17 @@ describe("domain rules", () => {
     expect(driverBlockReason({ driverBlocked: false, driverApproved: false, licenseValidUntil: null }, now)).toBe("not_approved");
     expect(driverBlockReason({ driverBlocked: false, driverApproved: true, licenseValidUntil: new Date("2026-06-01T00:00:00Z") }, now)).toBe("license_expired");
     expect(driverBlockReason({ driverBlocked: false, driverApproved: true, licenseValidUntil: new Date("2026-07-01T00:00:00Z") }, now)).toBeNull();
+  });
+
+  it("requires the QR feature gate only when QR is newly enabled", () => {
+    // Vehicle creation (no previous state): gate fires purely on whether QR is on.
+    expect(qrFeatureGateRequired(false)).toBe(false);
+    expect(qrFeatureGateRequired(true)).toBe(true);
+    // Vehicle update: only block when switching QR from off to on.
+    expect(qrFeatureGateRequired(true, false)).toBe(true); // newly enabling
+    expect(qrFeatureGateRequired(true, true)).toBe(false); // already on, plain re-save
+    expect(qrFeatureGateRequired(false, true)).toBe(false); // turning QR off
+    expect(qrFeatureGateRequired(false, false)).toBe(false); // stays off
   });
 
   it("separates regular users from fleet admin roles", () => {

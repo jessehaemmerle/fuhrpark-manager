@@ -21,5 +21,13 @@ export const storageProvider = {
   driver: process.env.UPLOAD_STORAGE_DRIVER ?? "local",
   maxPhotoUrls: MAX_PHOTO_URLS,
   acceptedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
+  acceptedDocumentMimeTypes: ["image/jpeg", "image/png", "image/webp", "application/pdf"],
   maxFileSizeMb: 8
 };
+
+export function validateDocumentUrl(url: string) {
+  if (!/^https?:\/\//.test(url) && !url.startsWith("/uploads/")) {
+    throw new Error("Dokumente müssen als HTTPS-URL oder lokaler Upload-Pfad referenziert werden.");
+  }
+  return url;
+}

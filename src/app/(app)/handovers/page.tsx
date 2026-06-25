@@ -1,5 +1,6 @@
 import { HandoverType } from "@prisma/client";
 import { EmptyState } from "@/components/app/empty-state";
+import { FileUploader } from "@/components/app/file-uploader";
 import { PageHeader } from "@/components/app/page-header";
 import { createHandover } from "@/server/actions";
 import { Badge } from "@/components/ui/badge";
@@ -172,7 +173,10 @@ export default async function HandoversPage() {
                 <Field name="createDamageTitle" label="Titel neuer Schaden" />
                 <TextBlock name="createDamageDescription" label="Beschreibung neuer Schaden" />
                 <Field name="signatureName" label="Unterschrift Name" />
-                <TextBlock name="photoUrls" label="Foto-URLs" />
+                <div className="grid gap-2">
+                  <Label>Fotos</Label>
+                  <FileUploader name="photoUrls" kind="photo" label="Fotos hochladen" />
+                </div>
                 <Button>Protokoll speichern</Button>
               </form>
             )}

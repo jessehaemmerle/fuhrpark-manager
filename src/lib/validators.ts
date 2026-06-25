@@ -196,7 +196,36 @@ export const companySettingsSchema = z.object({
   country: z.string().trim().min(2).max(2),
   contactEmail: z.string().trim().email(),
   contactPhone: optionalShortText,
-  retentionPeriodDays: z.coerce.number().int().min(30).max(3650)
+  retentionPeriodDays: z.coerce.number().int().min(30).max(3650),
+  licenseCheckIntervalDays: z.coerce.number().int().min(30).max(1095),
+  locale: z.enum(["de", "en"]).default("de")
+});
+
+export const notificationPreferenceSchema = z.object({
+  notifyByEmail: checkbox.default(false)
+});
+
+export const invitationSchema = z.object({
+  email: z.string().trim().email("Bitte gueltige E-Mail eingeben.").toLowerCase(),
+  name: optionalShortText,
+  role: z.nativeEnum(UserRole),
+  departmentId: z.preprocess((value) => (value === "" ? undefined : value), idSchema.optional())
+});
+
+export const invitationAcceptSchema = z
+  .object({
+    token: z.string().trim().min(20, "Einladungslink ist ungueltig."),
+    name: requiredText("Name"),
+    password: passwordSchema,
+    confirmPassword: z.string().min(1, "Bitte Passwort bestaetigen.")
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Die Passwoerter stimmen nicht ueberein.",
+    path: ["confirmPassword"]
+  });
+
+export const twoFactorConfirmSchema = z.object({
+  code: z.string().trim().regex(/^\d{6}$/, "Bitte den 6-stelligen Code eingeben.")
 });
 
 export const platformUserAccessSchema = z.object({

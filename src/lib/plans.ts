@@ -20,6 +20,9 @@ export type PlanConfig = {
   qrCodeAccess: boolean;
   maintenanceModuleAccess: boolean;
   driverPermissionAccess: boolean;
+  costTrackingAccess: boolean;
+  documentManagementAccess: boolean;
+  complianceAccess: boolean;
   prioritySupport: boolean;
 };
 
@@ -42,6 +45,9 @@ export const PLAN_CONFIG: Record<SubscriptionTier, PlanConfig> = {
     qrCodeAccess: true,
     maintenanceModuleAccess: true,
     driverPermissionAccess: true,
+    costTrackingAccess: false,
+    documentManagementAccess: false,
+    complianceAccess: true,
     prioritySupport: false
   },
   BASIC: {
@@ -60,6 +66,9 @@ export const PLAN_CONFIG: Record<SubscriptionTier, PlanConfig> = {
     qrCodeAccess: true,
     maintenanceModuleAccess: true,
     driverPermissionAccess: true,
+    costTrackingAccess: true,
+    documentManagementAccess: false,
+    complianceAccess: true,
     prioritySupport: false
   },
   PROFESSIONAL: {
@@ -78,6 +87,9 @@ export const PLAN_CONFIG: Record<SubscriptionTier, PlanConfig> = {
     qrCodeAccess: true,
     maintenanceModuleAccess: true,
     driverPermissionAccess: true,
+    costTrackingAccess: true,
+    documentManagementAccess: true,
+    complianceAccess: true,
     prioritySupport: true
   },
   ENTERPRISE: {
@@ -96,6 +108,9 @@ export const PLAN_CONFIG: Record<SubscriptionTier, PlanConfig> = {
     qrCodeAccess: true,
     maintenanceModuleAccess: true,
     driverPermissionAccess: true,
+    costTrackingAccess: true,
+    documentManagementAccess: true,
+    complianceAccess: true,
     prioritySupport: true
   }
 };
@@ -179,7 +194,7 @@ export async function assertWithinPlan(companyId: string, metric: UsageMetric) {
   }
 }
 
-export function assertFeatureAccess(plan: PlanConfig, feature: keyof Pick<PlanConfig, "analyticsAccess" | "csvExportAccess" | "customBrandingAccess" | "qrCodeAccess" | "maintenanceModuleAccess" | "driverPermissionAccess">) {
+export function assertFeatureAccess(plan: PlanConfig, feature: keyof Pick<PlanConfig, "analyticsAccess" | "csvExportAccess" | "customBrandingAccess" | "qrCodeAccess" | "maintenanceModuleAccess" | "driverPermissionAccess" | "costTrackingAccess" | "documentManagementAccess" | "complianceAccess">) {
   if (!plan[feature]) {
     throw new Error("Diese Funktion ist in Ihrem aktuellen Plan nicht enthalten.");
   }

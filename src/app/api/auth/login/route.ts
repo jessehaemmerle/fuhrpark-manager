@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { setSessionCookie, verifyPassword } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { assertRateLimit } from "@/lib/rate-limit";
+import { hashRecoveryCode, verifyTotp } from "@/lib/totp";
 import { loginSchema } from "@/lib/auth-validators";
 
 function requesterKey(request: NextRequest) {
@@ -30,6 +31,30 @@ export async function POST(request: NextRequest) {
 
     if (!user.active || (!user.company.active && user.role !== "PLATFORM_ADMIN")) {
       return NextResponse.json({ error: "Dieses Konto ist nicht aktiv." }, { status: 403 });
+    }
+
+    if (user.twoFactorEnabled) {
+      const code = typeof body.code === "string" ? body.code.trim() : "";
+      if (!code) {
+        return NextResponse.json({ twoFactorRequired: true });
+      }
+
+      const okTotp = user.twoFactorSecret ? verifyTotp(user.twoFactorSecret, code) : false;
+      let okRecovery = false;
+      if (!okTotp && user.twoFactorRecoveryCodes.length > 0) {
+        const hashed = hashRecoveryCode(code);
+        if (user.twoFactorRecoveryCodes.includes(hashed)) {
+          okRecovery = true;
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { twoFactorRecoveryCodes: user.twoFactorRecoveryCodes.filter((stored) => stored !== hashed) }
+          });
+        }
+      }
+
+      if (!okTotp && !okRecovery) {
+        return NextResponse.json({ error: "Der Authenticator-Code ist ungültig.", twoFactorRequired: true }, { status: 401 });
+      }
     }
 
     await setSessionCookie(user);
