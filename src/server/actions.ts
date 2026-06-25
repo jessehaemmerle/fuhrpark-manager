@@ -19,7 +19,8 @@ import {
   requireCompanyScope,
   requireFleetAdmin,
   requireOwner,
-  requireRole
+  requireRole,
+  verifyPassword
 } from "@/lib/auth";
 import { assertValidTimeRange, assertVehicleAvailability, findActiveTripConflict, validateMileage } from "@/lib/availability";
 import { qrFeatureGateRequired } from "@/lib/domain-rules";
@@ -47,6 +48,7 @@ import {
   platformLicenseIdSchema,
   platformLicenseUpdateSchema,
   platformUserAccessSchema,
+  subscriptionTierSchema,
   tripCorrectionSchema,
   tripEndSchema,
   tripStartSchema,
@@ -1396,6 +1398,63 @@ export async function updatePlatformUserAccess(formData: FormData) {
   });
   revalidatePath("/admin");
   revalidatePath("/users");
+}
+
+export async function changeSubscriptionTier(formData: FormData) {
+  const user = await requireAuth();
+  requireOwner(user);
+  const data = parseForm(subscriptionTierSchema, formData);
+  const company = await prisma.company.findUniqueOrThrow({ where: { id: user.companyId } });
+
+  requireCompanyScope(user, company.id);
+  await prisma.company.update({
+    where: { id: company.id },
+    data: { subscriptionTier: data.tier }
+  });
+
+  await writeAuditLog({
+    companyId: company.id,
+    actorUserId: user.id,
+    action: "subscription.tier_changed",
+    entityType: "Company",
+    entityId: company.id,
+    metadata: { from: company.subscriptionTier, to: data.tier, paymentIntegration: "not_configured" }
+  });
+  revalidatePath("/subscription");
+  revalidatePath("/dashboard");
+}
+
+export async function changeOwnPassword(formData: FormData) {
+  const user = await requireAuth();
+  const currentPassword = formData.get("currentPassword");
+  const newPassword = formData.get("newPassword");
+  const confirmPassword = formData.get("confirmPassword");
+
+  if (typeof currentPassword !== "string" || !currentPassword) throw new Error("Aktuelles Passwort fehlt.");
+  if (typeof newPassword !== "string" || newPassword.length < 10) throw new Error("Neues Passwort muss mindestens 10 Zeichen haben.");
+  if (newPassword !== confirmPassword) throw new Error("Die Passwoerter stimmen nicht ueberein.");
+
+  const { passwordHash } = await prisma.user.findUniqueOrThrow({
+    where: { id: user.id },
+    select: { passwordHash: true }
+  });
+
+  const valid = await verifyPassword(currentPassword, passwordHash);
+  if (!valid) throw new Error("Das aktuelle Passwort ist falsch.");
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: await hashPassword(newPassword) }
+  });
+
+  await writeAuditLog({
+    companyId: user.companyId,
+    actorUserId: user.id,
+    action: "user.password_changed",
+    entityType: "User",
+    entityId: user.id
+  });
+  revalidatePath("/profile");
 }
 
 export async function assertVehicleTokenAccess(token: string) {

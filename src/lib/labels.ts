@@ -155,9 +155,22 @@ export const invitationStatusLabels: Record<string, string> = {
   EXPIRED: "Abgelaufen"
 };
 
+export const invoiceStatusLabels: Record<string, string> = {
+  DRAFT: "Entwurf",
+  ISSUED: "Offen",
+  SENT: "Versendet",
+  PAID: "Bezahlt",
+  CANCELLED: "Storniert"
+};
+
+export const invoiceTaxModeLabels: Record<string, string> = {
+  STANDARD: "Standard (USt)",
+  REVERSE_CHARGE: "Reverse Charge"
+};
+
 export function statusTone(status: string) {
-  if (["AVAILABLE", "APPROVED", "COMPLETED", "RESOLVED", "ACTIVE", "VALID", "ACCEPTED"].includes(status)) return "success";
-  if (["PENDING", "PLANNED", "IN_REVIEW", "SCHEDULED_FOR_REPAIR", "IN_PROGRESS", "NOT_PRESENTED"].includes(status)) return "warning";
+  if (["AVAILABLE", "APPROVED", "COMPLETED", "RESOLVED", "ACTIVE", "VALID", "ACCEPTED", "PAID", "SENT"].includes(status)) return "success";
+  if (["PENDING", "PLANNED", "IN_REVIEW", "SCHEDULED_FOR_REPAIR", "IN_PROGRESS", "NOT_PRESENTED", "DRAFT", "ISSUED"].includes(status)) return "warning";
   if (["REJECTED", "CANCELLED", "CRITICAL", "DOWNTIME", "RETIRED", "ARCHIVED", "INVALID", "REVOKED", "EXPIRED"].includes(status)) return "danger";
   return "neutral";
 }
