@@ -20,9 +20,37 @@ NODE
   export DATABASE_URL
 fi
 
+PRISMA="node node_modules/prisma/build/index.js"
+
+run_migrations() {
+  if $PRISMA migrate deploy; then
+    return 0
+  fi
+
+  # Deploy fehlgeschlagen. Haeufigste Ursache nach einem zuvor abgebrochenen
+  # Deploy: eine als "failed" markierte Migration (Fehlercode P3009). Da Prisma
+  # jede Migration in einer Transaktion ausfuehrt, wurde eine fehlgeschlagene
+  # Migration vollstaendig zurueckgerollt - sie kann daher sicher als
+  # "rolled-back" markiert und erneut angewendet werden.
+  failed="$(node scripts/list-failed-migrations.mjs || true)"
+  if [ -z "$failed" ]; then
+    echo "[start] FEHLER: Migrationen fehlgeschlagen und keine als 'failed' markierte Migration gefunden. Abbruch." >&2
+    return 1
+  fi
+
+  echo "[start] WARNUNG: Fehlgeschlagene Migration(en) erkannt. Versuche automatische Wiederherstellung (resolve --rolled-back)..." >&2
+  for migration in $failed; do
+    echo "[start] -> Markiere '$migration' als rolled-back." >&2
+    $PRISMA migrate resolve --rolled-back "$migration"
+  done
+
+  echo "[start] Wende Migrationen nach Wiederherstellung erneut an..."
+  $PRISMA migrate deploy
+}
+
 if [ "${RUN_MIGRATIONS:-true}" != "false" ]; then
   echo "[start] Datenbank-Migrationen werden angewendet (prisma migrate deploy)..."
-  node node_modules/prisma/build/index.js migrate deploy
+  run_migrations
   echo "[start] Migrationen erfolgreich angewendet."
 fi
 
