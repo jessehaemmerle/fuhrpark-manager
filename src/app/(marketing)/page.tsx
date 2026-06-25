@@ -40,7 +40,7 @@ export default function LandingPage() {
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg">
-              <Link href="/register">Free Trial starten</Link>
+              <Link href="/contact">Vertrieb kontaktieren</Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="border-white/30 bg-white/10 text-white hover:bg-white/20">
               <Link href="/book-demo">Demo buchen</Link>

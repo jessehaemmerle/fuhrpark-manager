@@ -34,7 +34,7 @@ export function PublicHeader() {
             </Link>
           </Button>
           <Button asChild size="sm" className="hidden sm:inline-flex">
-            <Link href="/register">Free Trial starten</Link>
+            <Link href="/contact">Vertrieb kontaktieren</Link>
           </Button>
         </div>
       </div>
@@ -56,7 +56,7 @@ export function PublicFooter() {
           </p>
         </div>
         <FooterColumn title="Produkt" links={[["/features", "Features"], ["/pricing", "Preise"], ["/book-demo", "Demo buchen"]]} />
-        <FooterColumn title="Unternehmen" links={[["/contact", "Kontakt"], ["/login", "Login"], ["/register", "Registrieren"]]} />
+        <FooterColumn title="Unternehmen" links={[["/contact", "Kontakt"], ["/login", "Login"], ["/book-demo", "Demo buchen"]]} />
         <FooterColumn title="Rechtliches" links={[["/impressum", "Impressum"], ["/datenschutz", "Datenschutz"], ["/agb", "AGB"]]} />
       </div>
     </footer>

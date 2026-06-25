@@ -261,7 +261,10 @@ const companyBaseShape = {
 
 export const platformCompanyCreateSchema = z.object({
   ...companyBaseShape,
-  trialDays: z.coerce.number().int().min(0).max(3650).default(14)
+  // Name der Kontaktperson fuer den automatisch erstellten Owner-Account.
+  contactName: optionalShortText,
+  // Einmalpasswort fuer den Erstzugang; muss beim ersten Login geaendert werden.
+  initialPassword: passwordSchema
 });
 
 export const platformCompanyUpdateSchema = z.object({

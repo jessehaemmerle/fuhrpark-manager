@@ -29,11 +29,13 @@ function limitLabel(value: number) {
 
 export function PricingCards({ compact = false }: { compact?: boolean }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {Object.values(PLAN_CONFIG).map((plan) => (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {Object.values(PLAN_CONFIG)
+        .filter((plan) => plan.tier !== "TRIAL")
+        .map((plan) => (
         <Card key={plan.tier} className={plan.tier === "PROFESSIONAL" ? "border-primary shadow-soft" : ""}>
           <CardHeader>
-            <div className="text-sm text-muted-foreground">{plan.tier === "TRIAL" ? "Starten" : "Skalieren"}</div>
+            <div className="text-sm text-muted-foreground">Skalieren</div>
             <CardTitle className="text-xl">{plan.name}</CardTitle>
             <div className="text-2xl font-semibold">{plan.monthlyPrice}</div>
           </CardHeader>
@@ -57,9 +59,7 @@ export function PricingCards({ compact = false }: { compact?: boolean }) {
               </div>
             ) : null}
             <Button asChild variant={plan.tier === "PROFESSIONAL" ? "default" : "outline"}>
-              <Link href={plan.tier === "TRIAL" ? "/register" : "/contact"}>
-                {plan.tier === "TRIAL" ? "Free Trial starten" : "Upgrade anfragen"}
-              </Link>
+              <Link href="/contact">Vertrieb kontaktieren</Link>
             </Button>
           </CardContent>
         </Card>

@@ -103,7 +103,10 @@ export default async function PlatformAdminPage() {
       <Card>
         <CardHeader>
           <CardTitle>Mandant anlegen</CardTitle>
-          <CardDescription>Mandanten koennen ohne Lizenz vorbereitet und spaeter separat lizenziert werden.</CardDescription>
+          <CardDescription>
+            Fuer die Kontakt-E-Mail wird automatisch ein Owner-Konto mit Einmalpasswort erstellt. Beim ersten Login muss
+            das Passwort geaendert werden. Bitte das Einmalpasswort sicher an den Kunden uebermitteln.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form action={createPlatformCompany} className="grid gap-4 lg:grid-cols-4">
@@ -112,12 +115,26 @@ export default async function PlatformAdminPage() {
               <Input id="tenantName" name="name" autoComplete="organization" required minLength={2} />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="tenantContactEmail">Kontakt-E-Mail</Label>
+              <Label htmlFor="tenantContactEmail">Kontakt-E-Mail (Login)</Label>
               <Input id="tenantContactEmail" name="contactEmail" type="email" autoComplete="email" required />
             </div>
+            <Field name="contactName" label="Kontaktperson (Name)" idSuffix="tenant-new" />
             <Field name="contactPhone" label="Telefon" idSuffix="tenant-new" />
             <Field name="vatId" label="UID-Nummer (optional)" idSuffix="tenant-new" />
             <Field name="billingEmail" label="Rechnungs-E-Mail (optional)" type="email" idSuffix="tenant-new" />
+            <div className="grid gap-2 lg:col-span-2">
+              <Label htmlFor="tenantInitialPassword">Einmalpasswort (Erstzugang)</Label>
+              <Input
+                id="tenantInitialPassword"
+                name="initialPassword"
+                defaultValue={temporaryPassword()}
+                autoComplete="new-password"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Mind. 10 Zeichen mit Gross-/Kleinbuchstabe und Zahl. Muss beim ersten Login geaendert werden.
+              </p>
+            </div>
             <div className="grid gap-2 lg:col-span-2">
               <Label htmlFor="tenantAddress">Adresse</Label>
               <Textarea id="tenantAddress" name="address" />
@@ -129,15 +146,16 @@ export default async function PlatformAdminPage() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="tenantSubscriptionTier">Plan</Label>
-              <SelectField id="tenantSubscriptionTier" name="subscriptionTier" defaultValue={SubscriptionTier.TRIAL}>
-                {Object.values(SubscriptionTier).map((tier) => (
-                  <option key={tier} value={tier}>
-                    {tierLabels[tier]}
-                  </option>
-                ))}
+              <SelectField id="tenantSubscriptionTier" name="subscriptionTier" defaultValue={SubscriptionTier.BASIC}>
+                {Object.values(SubscriptionTier)
+                  .filter((tier) => tier !== SubscriptionTier.TRIAL)
+                  .map((tier) => (
+                    <option key={tier} value={tier}>
+                      {tierLabels[tier]}
+                    </option>
+                  ))}
               </SelectField>
             </div>
-            <Field name="trialDays" label="Gueltigkeit (Tage)" type="number" defaultValue="14" idSuffix="tenant-new" />
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" name="active" defaultChecked />
               Aktiv

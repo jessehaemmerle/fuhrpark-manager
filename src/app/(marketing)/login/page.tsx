@@ -35,8 +35,8 @@ export default async function LoginPage({ searchParams }: { searchParams?: { nex
           </p>
           <p className="mt-5 text-sm text-muted-foreground">
             Noch kein Konto?{" "}
-            <Link href="/register" className="font-semibold text-primary">
-              Trial starten
+            <Link href="/contact" className="font-semibold text-primary">
+              Vertrieb kontaktieren
             </Link>
           </p>
         </CardContent>

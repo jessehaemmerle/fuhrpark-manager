@@ -106,11 +106,6 @@ async function uniqueCompanySlug(companyName: string) {
   return slug;
 }
 
-function futureDateFromDays(days: number) {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return date;
-}
 
 async function syncCompanyFromLatestActiveLicense(companyId: string) {
   const company = await prisma.company.findUnique({
@@ -1105,37 +1100,78 @@ export async function updateCompanySettings(formData: FormData) {
 export async function createPlatformCompany(formData: FormData) {
   const actor = await requireRole(["PLATFORM_ADMIN"]);
   const data = parseForm(platformCompanyCreateSchema, formData);
+
+  // Es gibt keine Self-Service-Trials mehr: Zugaenge werden ausschliesslich vom
+  // Vertrieb/Plattform-Admin angelegt. Fuer die Kontakt-E-Mail wird automatisch
+  // ein Owner-Account mit Einmalpasswort erzeugt, das beim ersten Login geaendert
+  // werden muss.
+  const existingUser = await prisma.user.findUnique({
+    where: { email: data.contactEmail },
+    select: { id: true }
+  });
+  if (existingUser) {
+    throw new Error(`Fuer ${data.contactEmail} existiert bereits ein Konto. Bitte eine andere Kontakt-E-Mail verwenden.`);
+  }
+
   const slug = await uniqueCompanySlug(data.name);
-  const trialStartDate = new Date();
-  const company = await prisma.company.create({
-    data: {
-      name: data.name,
-      slug,
-      address: data.address ?? null,
-      country: data.country,
-      contactEmail: data.contactEmail,
-      contactPhone: data.contactPhone ?? null,
-      primaryBrandColor: data.primaryBrandColor,
-      subscriptionTier: data.subscriptionTier,
-      trialStartDate,
-      trialEndDate: futureDateFromDays(data.trialDays),
-      active: data.active,
-      isPlatformCompany: false
-    }
+  const passwordHash = await hashPassword(data.initialPassword);
+
+  const result = await prisma.$transaction(async (tx) => {
+    const company = await tx.company.create({
+      data: {
+        name: data.name,
+        slug,
+        address: data.address ?? null,
+        country: data.country,
+        contactEmail: data.contactEmail,
+        contactPhone: data.contactPhone ?? null,
+        primaryBrandColor: data.primaryBrandColor,
+        subscriptionTier: data.subscriptionTier,
+        trialStartDate: new Date(),
+        // Kein Trial-Ablauf: Zugriff wird ueber Lizenzen gesteuert.
+        trialEndDate: UNLIMITED_LICENSE_DATE,
+        active: data.active,
+        isPlatformCompany: false
+      }
+    });
+
+    const owner = await tx.user.create({
+      data: {
+        companyId: company.id,
+        name: data.contactName || data.name,
+        email: data.contactEmail,
+        passwordHash,
+        role: "OWNER",
+        active: true,
+        driverApproved: true,
+        mustChangePassword: true,
+        temporaryPasswordIssuedAt: new Date()
+      }
+    });
+
+    return { company, owner };
   });
 
   await writeAuditLog({
-    companyId: company.id,
+    companyId: result.company.id,
     actorUserId: actor.id,
     action: "platform.company_created",
     entityType: "Company",
-    entityId: company.id,
+    entityId: result.company.id,
     metadata: {
-      slug: company.slug,
-      tier: company.subscriptionTier,
-      active: company.active,
+      slug: result.company.slug,
+      tier: result.company.subscriptionTier,
+      active: result.company.active,
       source: "platform_admin"
     }
+  });
+  await writeAuditLog({
+    companyId: result.company.id,
+    actorUserId: actor.id,
+    action: "platform.initial_user_created",
+    entityType: "User",
+    entityId: result.owner.id,
+    metadata: { email: result.owner.email, role: result.owner.role, mustChangePassword: true }
   });
 
   revalidatePath("/admin");
