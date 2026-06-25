@@ -32,14 +32,23 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    expose:
-      - "3000"
+    # App wird direkt auf dem Host veröffentlicht. Caddy (auf dem Host)
+    # macht das TLS/Domain-Reverse-Proxying auf diesen Port.
+    # Bindung nur an localhost, damit der Klartext-Port nicht öffentlich
+    # (unter Umgehung von HTTPS) erreichbar ist. Läuft Caddy in einem eigenen
+    # Container, APP_BIND auf 0.0.0.0 setzen.
+    ports:
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8082}:3000"
     volumes:
       - fleetbase_uploads_prod:/app/public/uploads
 
+  # Optionaler nginx-Reverse-Proxy. Wird NICHT benötigt, wenn Caddy davor
+  # läuft. Nur bei Bedarf aktivieren: `docker compose --profile nginx up -d`.
   reverse-proxy:
     image: nginx:1.27-alpine
     restart: unless-stopped
+    profiles:
+      - nginx
     depends_on:
       app:
         condition: service_healthy

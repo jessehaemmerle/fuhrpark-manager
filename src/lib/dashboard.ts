@@ -23,7 +23,8 @@ export async function getDashboardData(companyId: string) {
     expiringDrivers,
     recentBookings,
     company,
-    usage
+    usage,
+    vehiclesWithServiceMileage
   ] = await Promise.all([
     prisma.vehicle.count({ where: { companyId, status: { not: VehicleStatus.RETIRED } } }),
     prisma.vehicle.count({ where: { companyId, status: VehicleStatus.AVAILABLE } }),
@@ -80,8 +81,18 @@ export async function getDashboardData(companyId: string) {
       take: 6
     }),
     prisma.company.findUniqueOrThrow({ where: { id: companyId } }),
-    getCompanyUsage(companyId)
+    getCompanyUsage(companyId),
+    prisma.vehicle.findMany({
+      where: { companyId, status: { not: VehicleStatus.RETIRED }, nextServiceMileage: { not: null } },
+      select: { id: true, licensePlate: true, brand: true, model: true, mileage: true, nextServiceMileage: true },
+      orderBy: { licensePlate: "asc" }
+    })
   ]);
+
+  const vehiclesNearService = vehiclesWithServiceMileage
+    .map((v) => ({ ...v, kmUntilService: (v.nextServiceMileage as number) - v.mileage }))
+    .filter((v) => v.kmUntilService <= 1000)
+    .sort((a, b) => a.kmUntilService - b.kmUntilService);
 
   return {
     metrics: {
@@ -95,11 +106,13 @@ export async function getDashboardData(companyId: string) {
       openDamageReports,
       upcomingMaintenanceCount: upcomingMaintenance.length,
       maintenanceCostsThisMonth: Number(maintenanceCosts._sum.cost ?? 0),
-      expiringDrivers: expiringDrivers.length
+      expiringDrivers: expiringDrivers.length,
+      vehiclesNearServiceCount: vehiclesNearService.length
     },
     upcomingMaintenance,
     expiringDrivers,
     recentBookings,
+    vehiclesNearService,
     company,
     plan: getPlan(company),
     usage

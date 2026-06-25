@@ -1,9 +1,13 @@
+import { SubscriptionTier } from "@prisma/client";
+import { changeSubscriptionTier } from "@/server/actions";
 import { PricingCards } from "@/components/marketing/pricing-cards";
-import { PageHeader } from "@/components/app/page-header";
 import { UsageBars } from "@/components/app/usage-bars";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { SelectField } from "@/components/ui/select-field";
 import { requireAuth, requireOwner } from "@/lib/auth";
+import { tierLabels } from "@/lib/labels";
 import { getCompanyUsage, getPlan } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
@@ -21,11 +25,15 @@ export default async function SubscriptionPage() {
 
   return (
     <div className="grid gap-6">
-      <PageHeader
-        eyebrow="Abonnement"
-        title="Abo & Nutzung"
-        description={`Trial endet am ${formatDate(company.trialEndDate)}.`}
-      />
+      <div>
+        <p className="text-sm font-semibold uppercase text-primary">Abonnement</p>
+        <h1 className="mt-2 text-3xl font-semibold">Abo & Nutzung</h1>
+        {company.subscriptionTier === "TRIAL" ? (
+          <p className="mt-2 text-muted-foreground">Testphase endet am {formatDate(company.trialEndDate)}.</p>
+        ) : (
+          <p className="mt-2 text-muted-foreground">Aktiver Plan: {plan.name}</p>
+        )}
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
         <Card>
@@ -34,18 +42,29 @@ export default async function SubscriptionPage() {
           </CardHeader>
           <CardContent className="grid gap-5">
             <UsageBars usage={usage} plan={plan} />
-            <p className="text-sm text-muted-foreground">
-              Lizenz, Trial-Laufzeit und Mandantenstatus werden zentral im Super-Admin-Panel verwaltet.
-            </p>
+            <form action={changeSubscriptionTier} className="grid gap-3">
+              <Label htmlFor="tier">Plan wechseln</Label>
+              <SelectField id="tier" name="tier" defaultValue={company.subscriptionTier}>
+                {Object.values(SubscriptionTier).map((tier) => (
+                  <option key={tier} value={tier}>
+                    {tierLabels[tier]}
+                  </option>
+                ))}
+              </SelectField>
+              <Button>Plan wechseln</Button>
+              <p className="text-xs text-muted-foreground">
+                Zahlungsintegration ist noch nicht aktiv. Diese Aktion aktualisiert nur das interne Subscription-Tier.
+              </p>
+            </form>
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Kontakt & Abrechnung</CardTitle>
+            <CardTitle>Enterprise & individuelle Angebote</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm text-muted-foreground">
-            <p>Planwechsel, Lizenzlaufzeit und Vertragsfragen werden zentral betreut.</p>
-            <p>Für Änderungen am Abo kontaktieren Sie den Vertrieb.</p>
+            <p>Benoetigen Sie mehr Fahrzeuge, unbegrenzte Nutzer oder individuelle Vertragslaufzeiten?</p>
+            <p>Unser Team erstellt Ihnen gerne ein massgeschneidertes Angebot.</p>
             <Button asChild variant="outline" className="w-fit">
               <a href="/contact">Vertrieb kontaktieren</a>
             </Button>

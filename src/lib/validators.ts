@@ -4,6 +4,7 @@ import {
   DamageStatus,
   FuelType,
   HandoverType,
+  InvoiceTaxMode,
   LicenseStatus,
   MaintenanceStatus,
   MaintenanceType,
@@ -53,7 +54,8 @@ export const vehicleSchema = z.object({
   location: optionalShortText,
   notes: optionalText,
   imageUrl: optionalShortText,
-  qrCodeEnabled: checkbox.default(false)
+  qrCodeEnabled: checkbox.default(false),
+  nextServiceMileage: z.preprocess((v) => (v === "" ? undefined : v), z.coerce.number().int().min(0).optional())
 });
 
 export const bookingSchema = z.object({
@@ -228,6 +230,10 @@ export const twoFactorConfirmSchema = z.object({
   code: z.string().trim().regex(/^\d{6}$/, "Bitte den 6-stelligen Code eingeben.")
 });
 
+export const subscriptionTierSchema = z.object({
+  tier: z.nativeEnum(SubscriptionTier)
+});
+
 export const platformUserAccessSchema = z.object({
   userId: idSchema,
   role: z.nativeEnum(UserRole),
@@ -235,12 +241,19 @@ export const platformUserAccessSchema = z.object({
   password: z.preprocess((value) => (value === "" ? undefined : value), passwordSchema.optional())
 });
 
+const optionalEmail = z.preprocess(
+  (value) => (value === "" || value === null ? undefined : value),
+  z.string().trim().email("Bitte gueltige E-Mail eingeben.").toLowerCase().optional()
+);
+
 const companyBaseShape = {
   name: requiredText("Firmenname"),
   address: optionalText,
   country: z.string().trim().min(2).max(2).default("DE"),
   contactEmail: z.string().trim().email("Bitte gueltige E-Mail eingeben.").toLowerCase(),
   contactPhone: optionalShortText,
+  vatId: optionalShortText,
+  billingEmail: optionalEmail,
   primaryBrandColor: z.string().trim().regex(/^#[0-9a-fA-F]{6}$/, "Bitte Hex-Farbe eingeben."),
   subscriptionTier: z.nativeEnum(SubscriptionTier),
   active: checkbox.default(false)
@@ -332,5 +345,53 @@ export const platformLicenseUpdateSchema = z
   });
 
 export const platformLicenseIdSchema = z.object({
+  licenseId: idSchema
+});
+
+// --- Plattform-Rechnungswesen --------------------------------------------
+
+export const billingSettingsSchema = z.object({
+  legalName: requiredText("Firmenname"),
+  addressLine1: requiredText("Adresse"),
+  addressLine2: optionalShortText,
+  postalCode: requiredText("PLZ", 1),
+  city: requiredText("Ort"),
+  country: z.string().trim().min(2).max(2).default("AT"),
+  vatId: requiredText("UID-Nummer", 4),
+  registrationInfo: optionalShortText,
+  email: z.string().trim().email("Bitte gueltige E-Mail eingeben.").toLowerCase(),
+  phone: optionalShortText,
+  website: optionalShortText,
+  iban: optionalShortText,
+  bic: optionalShortText,
+  bankName: optionalShortText,
+  invoiceNumberPrefix: z.string().trim().min(1, "Praefix erforderlich.").max(12),
+  taxRatePercent: z.coerce.number().int().min(0).max(99),
+  paymentTermsDays: z.coerce.number().int().min(0).max(180),
+  footerNote: optionalText,
+  reverseChargeNote: requiredText("Reverse-Charge-Hinweis", 4)
+});
+
+const euroAmount = z.coerce.number().min(0).max(1_000_000);
+
+export const invoiceDraftSchema = z.object({
+  invoiceId: idSchema,
+  description: requiredText("Beschreibung"),
+  netAmountEuros: euroAmount,
+  taxMode: z.nativeEnum(InvoiceTaxMode),
+  taxRatePercent: z.coerce.number().int().min(0).max(99),
+  notes: optionalText
+});
+
+export const invoiceIdSchema = z.object({
+  invoiceId: idSchema
+});
+
+export const issueInvoiceSchema = z.object({
+  invoiceId: idSchema,
+  recipientEmail: optionalEmail
+});
+
+export const createInvoiceForLicenseSchema = z.object({
   licenseId: idSchema
 });

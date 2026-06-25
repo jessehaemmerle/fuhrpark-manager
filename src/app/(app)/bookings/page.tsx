@@ -1,7 +1,5 @@
-import { BookingStatus } from "@prisma/client";
 import Link from "next/link";
-import { EmptyState } from "@/components/app/empty-state";
-import { PageHeader } from "@/components/app/page-header";
+import { BookingStatus } from "@prisma/client";
 import { approveBooking, createBooking, rejectBooking, updateBookingStatus } from "@/server/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,15 +20,12 @@ export const metadata = {
 export default async function BookingsPage({ searchParams }: { searchParams: { status?: BookingStatus } }) {
   const user = await requireAuth();
   const manager = isFleetAdmin(user.role);
-  const bookingScopeWhere = {
-    companyId: user.companyId,
-    userId: manager ? undefined : user.id
-  };
-  const [bookings, vehicles, bookingStatusRows] = await Promise.all([
+  const [bookings, vehicles] = await Promise.all([
     prisma.booking.findMany({
       where: {
-        ...bookingScopeWhere,
-        status: searchParams.status
+        companyId: user.companyId,
+        status: searchParams.status,
+        userId: manager ? undefined : user.id
       },
       include: { vehicle: true, user: true, approvedBy: true, rejectedBy: true },
       orderBy: { startAt: "desc" }
@@ -38,47 +33,26 @@ export default async function BookingsPage({ searchParams }: { searchParams: { s
     prisma.vehicle.findMany({
       where: { companyId: user.companyId, status: { not: "RETIRED" } },
       orderBy: { licensePlate: "asc" }
-    }),
-    prisma.booking.groupBy({
-      by: ["status"],
-      where: bookingScopeWhere,
-      _count: { _all: true }
     })
   ]);
-  const hasFilters = Boolean(searchParams.status);
-  const statusCounts = new Map(bookingStatusRows.map((row) => [row.status, row._count._all]));
-  const allBookingsCount = bookingStatusRows.reduce((sum, row) => sum + row._count._all, 0);
 
   return (
     <div className="grid gap-6">
-      <PageHeader
-        eyebrow="Buchungen"
-        title="Buchungen"
-        description="Fahrzeuge anfragen, Freigaben prüfen und laufende Buchungen verwalten."
-        actions={
-          <Button asChild>
-            <a href="#new-booking">Buchung anfragen</a>
-          </Button>
-        }
-      />
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <p className="text-sm font-semibold uppercase text-primary">Buchungsworkflow</p>
+          <h1 className="mt-2 text-3xl font-semibold">Buchungen</h1>
+        </div>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/bookings/calendar">Kalenderansicht</Link>
+        </Button>
+      </div>
       <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <Card>
           <CardHeader>
             <CardTitle>Buchungshistorie</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <div className="flex flex-wrap gap-2">
-              <Button asChild size="sm" variant={!searchParams.status ? "default" : "outline"}>
-                <Link href="/bookings">Alle ({allBookingsCount})</Link>
-              </Button>
-              {Object.values(BookingStatus).map((status) => (
-                <Button key={status} asChild size="sm" variant={searchParams.status === status ? "default" : "outline"}>
-                  <Link href={`/bookings?status=${status}`}>
-                    {bookingStatusLabels[status]} ({statusCounts.get(status) ?? 0})
-                  </Link>
-                </Button>
-              ))}
-            </div>
             <form className="flex flex-wrap gap-3">
               <SelectField name="status" defaultValue={searchParams.status ?? ""} className="max-w-56">
                 <option value="">Alle Status</option>
@@ -88,61 +62,9 @@ export default async function BookingsPage({ searchParams }: { searchParams: { s
                   </option>
                 ))}
               </SelectField>
-              <Button variant="outline">Anwenden</Button>
-              {hasFilters ? (
-                <Button asChild variant="ghost">
-                  <Link href="/bookings">Zurücksetzen</Link>
-                </Button>
-              ) : null}
+              <Button variant="outline">Filtern</Button>
             </form>
-            <div className="grid gap-3 md:hidden">
-              {bookings.map((booking) => (
-                <div key={booking.id} className="rounded-md border p-3 text-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-semibold">{booking.vehicle.licensePlate}</p>
-                      <p className="mt-1 text-muted-foreground">{booking.user.name}</p>
-                    </div>
-                    <Badge tone={statusTone(booking.status)}>{bookingStatusLabels[booking.status]}</Badge>
-                  </div>
-                  <p className="mt-3 text-muted-foreground">
-                    {formatDateTime(booking.startAt)} bis {formatDateTime(booking.endAt)}
-                  </p>
-                  <p className="mt-2 font-medium">{booking.purpose}</p>
-                  {booking.destination ? <p className="mt-1 text-muted-foreground">{booking.destination}</p> : null}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {manager && booking.status === "PENDING" ? (
-                      <>
-                        <form action={approveBooking}>
-                          <input type="hidden" name="bookingId" value={booking.id} />
-                          <Button size="sm">Genehmigen</Button>
-                        </form>
-                        <form action={rejectBooking}>
-                          <input type="hidden" name="bookingId" value={booking.id} />
-                          <input type="hidden" name="note" value="Abgelehnt im Dashboard" />
-                          <Button size="sm" variant="outline">Ablehnen</Button>
-                        </form>
-                      </>
-                    ) : null}
-                    {["PENDING", "APPROVED"].includes(booking.status) ? (
-                      <form action={updateBookingStatus}>
-                        <input type="hidden" name="bookingId" value={booking.id} />
-                        <input type="hidden" name="status" value={BookingStatus.CANCELLED} />
-                        <Button size="sm" variant="ghost">Stornieren</Button>
-                      </form>
-                    ) : null}
-                    {manager && booking.status === "APPROVED" ? (
-                      <form action={updateBookingStatus}>
-                        <input type="hidden" name="bookingId" value={booking.id} />
-                        <input type="hidden" name="status" value={BookingStatus.COMPLETED} />
-                        <Button size="sm" variant="outline">Abschließen</Button>
-                      </form>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="hidden overflow-x-auto md:block">
+            <div className="overflow-x-auto">
               <table className="w-full min-w-[900px] text-sm">
                 <thead>
                   <tr className="border-b text-left text-muted-foreground">
@@ -195,68 +117,48 @@ export default async function BookingsPage({ searchParams }: { searchParams: { s
                             <form action={updateBookingStatus}>
                               <input type="hidden" name="bookingId" value={booking.id} />
                               <input type="hidden" name="status" value={BookingStatus.COMPLETED} />
-                              <Button size="sm" variant="outline">Abschließen</Button>
+                              <Button size="sm" variant="outline">Abschliessen</Button>
                             </form>
                           ) : null}
                         </div>
                       </td>
                     </tr>
-                ))}
-              </tbody>
-            </table>
+                  ))}
+                </tbody>
+              </table>
+              {bookings.length === 0 ? <p className="py-8 text-center text-sm text-muted-foreground">Keine Buchungen.</p> : null}
             </div>
-            {bookings.length === 0 ? (
-              <EmptyState
-                title="Keine Buchungen gefunden"
-                description={hasFilters ? "Setzen Sie den Statusfilter zurück, um alle Buchungen zu sehen." : "Neue Buchungen erscheinen hier sofort nach dem Absenden."}
-                action={
-                  hasFilters ? (
-                    <Button asChild size="sm" variant="outline">
-                      <Link href="/bookings">Filter zurücksetzen</Link>
-                    </Button>
-                  ) : (
-                    <Button asChild size="sm">
-                      <a href="#new-booking">Buchung anfragen</a>
-                    </Button>
-                  )
-                }
-              />
-            ) : null}
           </CardContent>
         </Card>
 
-        <Card id="new-booking">
+        <Card>
           <CardHeader>
             <CardTitle>Buchung anfragen</CardTitle>
           </CardHeader>
           <CardContent>
-            {vehicles.length === 0 ? (
-              <EmptyState title="Keine Fahrzeuge verfügbar" description="Legen Sie zuerst ein Fahrzeug an, bevor Buchungen erstellt werden können." />
-            ) : (
-              <form action={createBooking} className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="vehicleId">Fahrzeug</Label>
-                  <SelectField id="vehicleId" name="vehicleId" required>
-                    {vehicles.map((vehicle) => (
-                      <option key={vehicle.id} value={vehicle.id}>
-                        {vehicle.licensePlate} · {vehicle.brand} {vehicle.model}
-                      </option>
-                    ))}
-                  </SelectField>
-                </div>
-                <DateField name="startAt" label="Start" />
-                <DateField name="endAt" label="Ende" />
-                <div className="grid gap-2">
-                  <Label htmlFor="purpose">Zweck</Label>
-                  <Textarea id="purpose" name="purpose" required />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="destination">Ziel</Label>
-                  <Input id="destination" name="destination" />
-                </div>
-                <Button>Buchung anfragen</Button>
-              </form>
-            )}
+            <form action={createBooking} className="grid gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="vehicleId">Fahrzeug</Label>
+                <SelectField id="vehicleId" name="vehicleId" required>
+                  {vehicles.map((vehicle) => (
+                    <option key={vehicle.id} value={vehicle.id}>
+                      {vehicle.licensePlate} · {vehicle.brand} {vehicle.model}
+                    </option>
+                  ))}
+                </SelectField>
+              </div>
+              <DateField name="startAt" label="Start" />
+              <DateField name="endAt" label="Ende" />
+              <div className="grid gap-2">
+                <Label htmlFor="purpose">Zweck</Label>
+                <Textarea id="purpose" name="purpose" required />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="destination">Ziel</Label>
+                <Input id="destination" name="destination" />
+              </div>
+              <Button>Absenden</Button>
+            </form>
           </CardContent>
         </Card>
       </div>

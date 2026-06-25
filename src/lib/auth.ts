@@ -22,6 +22,7 @@ export type AuthenticatedUser = {
   mustChangePassword: boolean;
   driverApproved: boolean;
   driverBlocked: boolean;
+  licenseClass: string | null;
   licenseValidUntil: Date | null;
   company: {
     id: string;
@@ -128,6 +129,7 @@ export async function getCurrentUser(): Promise<AuthenticatedUser | null> {
         mustChangePassword: true,
         driverApproved: true,
         driverBlocked: true,
+        licenseClass: true,
         licenseValidUntil: true,
         company: {
           select: {

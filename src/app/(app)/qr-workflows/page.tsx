@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { QrCode } from "lucide-react";
-import { EmptyState } from "@/components/app/empty-state";
-import { PageHeader } from "@/components/app/page-header";
 import { disableVehicleQr, regenerateVehicleQr } from "@/server/actions";
+import { ConfirmButton } from "@/components/ui/confirm-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +10,7 @@ import { prisma } from "@/lib/prisma";
 import { getAppUrl } from "@/lib/utils";
 
 export const metadata = {
-  title: "QR-Workflows"
+  title: "QR Workflows"
 };
 
 export default async function QrWorkflowsPage() {
@@ -24,11 +23,10 @@ export default async function QrWorkflowsPage() {
 
   return (
     <div className="grid gap-6">
-      <PageHeader
-        eyebrow="QR-Codes"
-        title="QR-Workflows"
-        description="Fahrzeugcodes verwalten und mobile Workflows direkt am Fahrzeug öffnen."
-      />
+      <div>
+        <p className="text-sm font-semibold uppercase text-primary">QR-Code Workflows</p>
+        <h1 className="mt-2 text-3xl font-semibold">QR Workflows</h1>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Fahrzeugcodes</CardTitle>
@@ -36,11 +34,10 @@ export default async function QrWorkflowsPage() {
         <CardContent className="grid gap-4">
           {vehicles.map((vehicle) => {
             const url = vehicle.qrCodeToken ? `${getAppUrl()}/v/${vehicle.qrCodeToken}` : null;
-            const qrActive = vehicle.qrCodeEnabled && Boolean(vehicle.qrCodeToken);
             return (
               <div key={vehicle.id} className="grid gap-4 rounded-md border p-4 lg:grid-cols-[120px_1fr_auto] lg:items-center">
                 <div className="flex h-24 w-24 items-center justify-center rounded-md border bg-white">
-                  {qrActive ? (
+                  {vehicle.qrCodeEnabled && vehicle.qrCodeToken ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={`/api/vehicles/${vehicle.id}/qr?format=svg`} alt="" className="h-20 w-20" />
                   ) : (
@@ -50,8 +47,8 @@ export default async function QrWorkflowsPage() {
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-semibold">{vehicle.licensePlate}</p>
-                    <Badge tone={qrActive ? "success" : "neutral"}>
-                      {qrActive ? "Aktiv" : "Deaktiviert"}
+                    <Badge tone={vehicle.qrCodeEnabled ? "success" : "neutral"}>
+                      {vehicle.qrCodeEnabled ? "Aktiv" : "Deaktiviert"}
                     </Badge>
                   </div>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -60,10 +57,10 @@ export default async function QrWorkflowsPage() {
                   <p className="mt-2 break-all text-xs text-muted-foreground">{url ?? "Kein aktiver Token"}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {qrActive ? (
+                  {vehicle.qrCodeEnabled && vehicle.qrCodeToken ? (
                     <>
                       <Button asChild size="sm" variant="outline">
-                        <Link href={`/v/${vehicle.qrCodeToken}`}>Öffnen</Link>
+                        <Link href={`/v/${vehicle.qrCodeToken}`}>QR-Seite oeffnen</Link>
                       </Button>
                       <Button asChild size="sm" variant="outline">
                         <Link href={`/api/vehicles/${vehicle.id}/qr?format=png`}>PNG</Link>
@@ -72,21 +69,27 @@ export default async function QrWorkflowsPage() {
                   ) : null}
                   <form action={regenerateVehicleQr}>
                     <input type="hidden" name="vehicleId" value={vehicle.id} />
-                    <Button size="sm">{qrActive ? "Regenerieren" : "QR-Code erstellen"}</Button>
+                    <Button size="sm" variant="outline">
+                      {vehicle.qrCodeEnabled ? "Token erneuern" : "QR aktivieren"}
+                    </Button>
                   </form>
-                  {qrActive ? (
+                  {vehicle.qrCodeEnabled ? (
                     <form action={disableVehicleQr}>
                       <input type="hidden" name="vehicleId" value={vehicle.id} />
-                      <Button size="sm" variant="destructive">Deaktivieren</Button>
+                      <ConfirmButton
+                        type="submit"
+                        size="sm"
+                        variant="destructive"
+                        message={`QR-Code fuer ${vehicle.licensePlate} wirklich deaktivieren? Bestehende ausgedruckte Codes funktionieren dann nicht mehr.`}
+                      >
+                        Deaktivieren
+                      </ConfirmButton>
                     </form>
                   ) : null}
                 </div>
               </div>
             );
           })}
-          {vehicles.length === 0 ? (
-            <EmptyState title="Keine Fahrzeuge verfügbar" description="Sobald Fahrzeuge angelegt sind, können hier QR-Codes erstellt werden." />
-          ) : null}
         </CardContent>
       </Card>
     </div>

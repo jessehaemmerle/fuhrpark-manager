@@ -1,22 +1,17 @@
 import {
   AlertTriangle,
-  ArrowRight,
   CalendarCheck,
   Car,
-  CheckCircle2,
   Gauge,
   ShieldAlert,
   TrendingUp,
-  Wrench
+  Wrench,
+  Milestone
 } from "lucide-react";
-import Link from "next/link";
 import { DashboardChart } from "@/components/app/dashboard-chart";
-import { EmptyState } from "@/components/app/empty-state";
 import { MetricCard } from "@/components/app/metric-card";
-import { PageHeader } from "@/components/app/page-header";
 import { UsageBars } from "@/components/app/usage-bars";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDashboardData } from "@/lib/dashboard";
 import { bookingStatusLabels, maintenanceStatusLabels, statusTone } from "@/lib/labels";
@@ -32,110 +27,42 @@ export default async function DashboardPage() {
   const data = await getDashboardData(user.companyId);
   const chartData = [
     { name: "Fahrzeuge", value: data.metrics.totalVehicles },
-    { name: "Verfügbar", value: data.metrics.availableVehicles },
+    { name: "Verfuegbar", value: data.metrics.availableVehicles },
     { name: "Buchungen", value: data.metrics.pendingBookings + data.metrics.approvedBookingsThisMonth },
     { name: "Fahrten", value: data.metrics.activeTrips },
-    { name: "Schäden", value: data.metrics.openDamageReports }
+    { name: "Schaeden", value: data.metrics.openDamageReports }
   ];
-  const canManageUsers = user.role === "OWNER" || user.role === "PLATFORM_ADMIN";
-  const actionItems = [
-    {
-      label: "Buchungen freigeben",
-      description: "Offene Anfragen warten auf Entscheidung.",
-      count: data.metrics.pendingBookings,
-      href: "/bookings?status=PENDING",
-      tone: "warning" as const
-    },
-    {
-      label: "Schäden prüfen",
-      description: "Offene Meldungen brauchen Status oder Reparaturplanung.",
-      count: data.metrics.openDamageReports,
-      href: "/damage-reports?status=OPEN",
-      tone: "danger" as const
-    },
-    {
-      label: "Wartung koordinieren",
-      description: "Geplante oder laufende Wartungen in den nächsten 30 Tagen.",
-      count: data.metrics.upcomingMaintenanceCount,
-      href: "/maintenance",
-      tone: "warning" as const
-    },
-    {
-      label: "Aktive Fahrten beobachten",
-      description: "Nicht abgeschlossene Fahrten im Fahrtenbuch.",
-      count: data.metrics.activeTrips,
-      href: "/trip-log?view=active",
-      tone: "neutral" as const
-    },
-    {
-      label: "Fahrerlaubnisse aktualisieren",
-      description: "Fahrerfreigaben laufen bald ab.",
-      count: data.metrics.expiringDrivers,
-      href: canManageUsers ? "/users" : "/dashboard",
-      tone: "warning" as const
-    }
-  ];
-  const visibleActionItems = actionItems.filter((item) => item.count > 0);
 
   return (
     <div className="grid gap-6">
-      <PageHeader
-        eyebrow="Dashboard"
-        title={`Guten Tag, ${user.name}`}
-        description={
-          <>
-            Trial bis {formatDate(data.company.trialEndDate)} · Plan {data.plan.name}
-          </>
-        }
-        actions={
-          <>
-            <Button asChild variant="outline">
-              <Link href="/bookings">Buchung anfragen</Link>
-            </Button>
-            <Button asChild>
-              <Link href="/trip-log">Fahrt starten</Link>
-            </Button>
-          </>
-        }
-      />
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <div>
+          <p className="text-sm font-semibold uppercase text-primary">Dashboard</p>
+          <h1 className="mt-2 text-3xl font-semibold">Guten Tag, {user.name}</h1>
+          <p className="mt-2 text-muted-foreground">
+            {data.company.subscriptionTier === "TRIAL"
+              ? `Testphase bis ${formatDate(data.company.trialEndDate)} · ${data.plan.name}`
+              : `Plan: ${data.plan.name}`}
+          </p>
+        </div>
+        <Badge tone={data.company.subscriptionTier === "TRIAL" ? "warning" : "success"}>
+          {data.company.subscriptionTier === "TRIAL" ? "Trial aktiv" : "Abo aktiv"}
+        </Badge>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Fahrzeuge" value={data.metrics.totalVehicles} icon={Car} />
-        <MetricCard label="Verfügbar" value={data.metrics.availableVehicles} icon={CalendarCheck} />
+        <MetricCard label="Verfuegbar" value={data.metrics.availableVehicles} icon={CalendarCheck} />
         <MetricCard label="Aktive Fahrten" value={data.metrics.activeTrips} icon={Gauge} />
-        <MetricCard label="Offene Schäden" value={data.metrics.openDamageReports} icon={AlertTriangle} />
-        <MetricCard label="Offene Buchungen" value={data.metrics.pendingBookings} icon={TrendingUp} />
-        <MetricCard label="Wartung nächste 30 Tage" value={data.metrics.upcomingMaintenanceCount} icon={Wrench} />
+        <MetricCard label="Offene Schaeden" value={data.metrics.openDamageReports} icon={AlertTriangle} />
+        <MetricCard label="Pending Buchungen" value={data.metrics.pendingBookings} icon={TrendingUp} />
+        <MetricCard label="Wartung naechste 30 Tage" value={data.metrics.upcomingMaintenanceCount} icon={Wrench} />
         <MetricCard label="Wartungskosten Monat" value={formatCurrency(data.metrics.maintenanceCostsThisMonth)} icon={Wrench} />
-        <MetricCard label="Fahrerlaubnis läuft ab" value={data.metrics.expiringDrivers} icon={ShieldAlert} />
+        <MetricCard label="Fahrerlaubnis laeuft ab" value={data.metrics.expiringDrivers} icon={ShieldAlert} />
+        {data.metrics.vehiclesNearServiceCount > 0 && (
+          <MetricCard label="Service faellig" value={data.metrics.vehiclesNearServiceCount} icon={Milestone} />
+        )}
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Heute wichtig</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-          {visibleActionItems.map((item) => (
-            <Link key={item.label} href={item.href} className="group rounded-md border p-4 text-sm transition-colors hover:bg-zinc-50">
-              <div className="flex items-start justify-between gap-3">
-                <Badge tone={item.tone}>{item.count}</Badge>
-                <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden />
-              </div>
-              <p className="mt-3 font-semibold">{item.label}</p>
-              <p className="mt-1 text-muted-foreground">{item.description}</p>
-            </Link>
-          ))}
-          {visibleActionItems.length === 0 ? (
-            <div className="rounded-md border bg-emerald-50 p-4 text-sm text-emerald-900 md:col-span-2 xl:col-span-5">
-              <div className="flex items-center gap-2 font-semibold">
-                <CheckCircle2 className="h-4 w-4" aria-hidden />
-                Keine akuten Aufgaben
-              </div>
-              <p className="mt-1 text-emerald-800">Buchungen, Schäden, Wartungen und Fahrerfreigaben sehen aktuell ruhig aus.</p>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
         <Card>
@@ -172,17 +99,6 @@ export default async function DashboardPage() {
                 <p className="mt-1 text-muted-foreground">{formatDateTime(booking.startAt)}</p>
               </div>
             ))}
-            {data.recentBookings.length === 0 ? (
-              <EmptyState
-                title="Keine aktuellen Buchungen"
-                description="Sobald eine Buchung erstellt oder genehmigt wird, erscheint sie hier."
-                action={
-                  <Button asChild size="sm">
-                    <Link href="/bookings">Buchung anfragen</Link>
-                  </Button>
-                }
-              />
-            ) : null}
           </CardContent>
         </Card>
         <Card>
@@ -200,9 +116,7 @@ export default async function DashboardPage() {
                 <p className="mt-1 text-muted-foreground">{formatDateTime(record.startAt)}</p>
               </div>
             ))}
-            {data.upcomingMaintenance.length === 0 ? (
-              <EmptyState title="Keine anstehenden Termine" description="Geplante Wartungen erscheinen automatisch in dieser Übersicht." />
-            ) : null}
+            {data.upcomingMaintenance.length === 0 ? <p className="text-sm text-muted-foreground">Keine Termine.</p> : null}
           </CardContent>
         </Card>
         <Card>
@@ -213,14 +127,37 @@ export default async function DashboardPage() {
             {data.expiringDrivers.map((driver) => (
               <div key={driver.id} className="rounded-md border p-3 text-sm">
                 <p className="font-medium">{driver.name}</p>
-                <p className="mt-1 text-muted-foreground">Gültig bis {formatDate(driver.licenseValidUntil)}</p>
+                <p className="mt-1 text-muted-foreground">Gueltig bis {formatDate(driver.licenseValidUntil)}</p>
               </div>
             ))}
             {data.expiringDrivers.length === 0 ? (
-              <EmptyState title="Keine bald ablaufenden Fahrerlaubnisse" description="Fahrerfreigaben mit Ablaufdatum werden hier frühzeitig sichtbar." />
+              <p className="text-sm text-muted-foreground">Keine bald ablaufenden Fahrerlaubnisse.</p>
             ) : null}
           </CardContent>
         </Card>
+        {data.vehiclesNearService.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Service faellig</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-3">
+              {data.vehiclesNearService.map((v) => {
+                const kmLeft = (v.nextServiceMileage ?? 0) - v.mileage;
+                return (
+                  <div key={v.id} className="rounded-md border p-3 text-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-medium">{v.licensePlate}</p>
+                      <Badge tone={kmLeft <= 0 ? "danger" : "warning"}>
+                        {kmLeft <= 0 ? "Ueberfaellig" : `${kmLeft.toLocaleString("de-DE")} km`}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-muted-foreground">{v.brand} {v.model}</p>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
